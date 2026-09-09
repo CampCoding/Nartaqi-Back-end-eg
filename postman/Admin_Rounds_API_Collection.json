@@ -1,0 +1,497 @@
+{
+  "info": {
+    "name": "Admin Rounds API Collection",
+    "description": "Complete CRUD operations for rounds management with Arabic responses",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Admin Rounds Management",
+      "item": [
+        {
+          "name": "Get All Rounds",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/rounds?per_page=10&page=1",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds"],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "10",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "course_category_id",
+                  "value": "",
+                  "description": "Filter by course category ID (optional)"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by status: 0=inactive, 1=active (optional)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by round name (optional)"
+                }
+              ]
+            },
+            "description": "Get all rounds with pagination and filtering options"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Rounds by Course Category",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/rounds/category/1?per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds", "category", "1"],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "10",
+                  "description": "Number of items per page"
+                }
+              ]
+            },
+            "description": "Get all rounds for a specific course category"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Round",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/rounds/1",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds", "1"]
+            },
+            "description": "Get a specific round by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create New Round",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Advanced Programming Round\",\n  \"description\": \"Advanced programming concepts and techniques for experienced developers\",\n  \"price\": 250.00,\n  \"start_date\": \"2025-02-01\",\n  \"end_date\": \"2025-02-28\",\n  \"gender\": \"both\",\n  \"for\": \"Experienced developers\",\n  \"goal\": \"Master advanced programming patterns and architectures\",\n  \"course_category_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/rounds",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds"]
+            },
+            "description": "Create a new round with all required fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Round with Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Web Development Round",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Complete web development course covering frontend and backend",
+                  "type": "text"
+                },
+                {
+                  "key": "price",
+                  "value": "300.00",
+                  "type": "text"
+                },
+                {
+                  "key": "start_date",
+                  "value": "2025-03-01",
+                  "type": "text"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2025-03-31",
+                  "type": "text"
+                },
+                {
+                  "key": "gender",
+                  "value": "both",
+                  "type": "text"
+                },
+                {
+                  "key": "for",
+                  "value": "Web developers",
+                  "type": "text"
+                },
+                {
+                  "key": "goal",
+                  "value": "Become a full-stack web developer",
+                  "type": "text"
+                },
+                {
+                  "key": "course_category_id",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/rounds",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds"]
+            },
+            "description": "Create a new round with image upload"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Round",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Programming Round\",\n  \"description\": \"Updated description for the programming round\",\n  \"price\": 200.00,\n  \"active\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/rounds/1",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds", "1"]
+            },
+            "description": "Update an existing round (partial update supported)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Round",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/rounds/1",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds", "1"]
+            },
+            "description": "Delete a round permanently"
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Round Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/rounds/1/toggle-status",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds", "1", "toggle-status"]
+            },
+            "description": "Toggle round status between active and inactive"
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Round",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/rounds/1/activate",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds", "1", "activate"]
+            },
+            "description": "Activate a round (set active = 1)"
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Round",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/rounds/1/deactivate",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "rounds", "1", "deactivate"]
+            },
+            "description": "Deactivate a round (set active = 0)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Complete CRUD operations for rounds management"
+    },
+    {
+      "name": "User APIs",
+      "item": [
+        {
+          "name": "Get Course Categories (User)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/categories/course-categories",
+              "host": ["{{base_url}}"],
+              "path": ["user", "categories", "course-categories"]
+            },
+            "description": "Get course categories for users"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Rounds (User)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/rounds/getRounds",
+              "host": ["{{base_url}}"],
+              "path": ["user", "rounds", "getRounds"]
+            },
+            "description": "Get rounds for users"
+          },
+          "response": []
+        }
+      ],
+      "description": "User-facing APIs for course categories and rounds"
+    },
+    {
+      "name": "Authentication APIs",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"201014520135\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/authentication/login",
+              "host": ["{{base_url}}"],
+              "path": ["authentication", "login"]
+            },
+            "description": "Login to get authentication token"
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ahmed Mohamed\",\n  \"phone\": \"201014520135\",\n  \"password\": \"password123\",\n  \"email\": \"ahmed@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/authentication/signup",
+              "host": ["{{base_url}}"],
+              "path": ["authentication", "signup"]
+            },
+            "description": "Register a new user"
+          },
+          "response": []
+        }
+      ],
+      "description": "Authentication endpoints for login and registration"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set base URL if not already set",
+          "if (!pm.environment.get('base_url')) {",
+          "    pm.environment.set('base_url', 'http://127.0.0.1:8000/api');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Log response for debugging",
+          "console.log('Response Status:', pm.response.status);",
+          "console.log('Response Body:', pm.response.text());",
+          "",
+          "// Check if response is successful",
+          "pm.test('Status code is successful', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+          "});",
+          "",
+          "// Check if response has Arabic message",
+          "if (pm.response.json() && pm.response.json().message) {",
+          "    pm.test('Response has Arabic message', function () {",
+          "        pm.expect(pm.response.json().message).to.be.a('string');",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

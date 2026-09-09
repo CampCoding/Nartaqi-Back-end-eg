@@ -1,0 +1,12 @@
+{
+    "name": "Admins",
+    "alias": "admins",
+     "active": true,
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Admins\\Providers\\AdminsServiceProvider"
+    ],
+    "files": []
+}
