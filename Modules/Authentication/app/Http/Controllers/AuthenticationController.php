@@ -103,7 +103,12 @@ class AuthenticationController extends Controller
         // إرسال الرسالة للمستخدم
         $result = sendWawpMessage(
             $phone,
-            "🔑 *رمز تأكيد حسابك:* *{$code}*\n⏳ تنتهي صلاحيته خلال: " . $this->formatMinutesRemaining($expiresAt, $userNow)
+            "🎓 مرحبًا بك في منصة نرتقي للتدريب وتنمية المهارات\n\n"
+                . "نسعد بانضمامك إلى نرتقي، ونتمنى لك تجربة تعليمية مميزة ومثمرة. 🌟\n\n"
+                . "🔐 كود التحقق الخاص بك:\n{$code}\n"
+                . "⏳ ينتهي الكود خلال: " . $this->formatMinutesRemaining($expiresAt, $userNow) . "\n\n"
+                . "يرجى إدخال الكود لإكمال عملية التسجيل في المنصة.\n\n"
+                . "✨ نرتقي بك... لنرتقي بمهاراتك ومستقبلك."
         );
         // $result = json_decode('رمز تاكيد منصه نرتقي هو : {1231} تنتهي صلاحيه الكود بعد  : {10 دقائق}', true);
 
@@ -212,7 +217,11 @@ class AuthenticationController extends Controller
         // إرسال الرسالة مع حساب الدقائق المتبقية بالنسبة للمستخدم
         $result = sendWawpMessage(
             $phone,
-            "🔑 *رمز استعادة كلمة المرور:* *{$code}*\n⏳ ينتهي خلال: " . $this->formatMinutesRemaining($expiresAt, $userNow)
+            "🎓 منصة نرتقي للتدريب وتنمية المهارات\n\n"
+                . "🔐 كود استعادة كلمة المرور الخاص بك:\n{$code}\n"
+                . "⏳ ينتهي الكود خلال: " . $this->formatMinutesRemaining($expiresAt, $userNow) . "\n\n"
+                . "يرجى إدخال الكود لإكمال عملية استعادة كلمة المرور.\n\n"
+                . "✨ نرتقي بك... لنرتقي بمهاراتك ومستقبلك."
         );
 
         if (isset($result['error'])) {

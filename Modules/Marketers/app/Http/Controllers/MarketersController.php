@@ -145,7 +145,12 @@ class MarketersController extends Controller
 
         $result = sendWawpMessage(
             $phone,
-            "🔑 *رمز تأكيد حسابك:* *{$code}*\n⏳ تنتهي صلاحيته خلال: " . formatMinutesRemaining($expiresAt)
+            "🎓 مرحبًا بك في منصة نرتقي للتدريب وتنمية المهارات\n\n"
+                . "نسعد بانضمامك إلى نرتقي، ونتمنى لك تجربة تعليمية مميزة ومثمرة. 🌟\n\n"
+                . "🔐 كود التحقق الخاص بك:\n{$code}\n"
+                . "⏳ ينتهي الكود خلال: " . formatMinutesRemaining($expiresAt) . "\n\n"
+                . "يرجى إدخال الكود لإكمال عملية التسجيل في المنصة.\n\n"
+                . "✨ نرتقي بك... لنرتقي بمهاراتك ومستقبلك."
         );
 
         if (isset($result['error'])) {

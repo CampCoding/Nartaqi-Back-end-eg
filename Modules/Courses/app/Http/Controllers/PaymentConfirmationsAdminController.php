@@ -42,7 +42,6 @@ class PaymentConfirmationsAdminController extends Controller
         $confirmation->save();
 
         if ($request->status === 'approved' || $request->status === 'rejected') {
-            $statusIcon = $request->status === 'approved' ? '✅' : '❌';
             $statusText = $request->status === 'approved' ? 'تم قبول' : 'تم رفض';
             $roundName = $confirmation->round ? $confirmation->round->name : 'الدورة التدريبية';
 
@@ -51,9 +50,9 @@ class PaymentConfirmationsAdminController extends Controller
                            ? $confirmation->student->name
                            : $confirmation->sender_name;
 
-            $smsMessage = "عزيزي الطالب/الطالبة *$studentName* 👋\n\n"
-                . "$statusIcon $statusText معاملتك المالية.\n"
-                . "📚 دورة: *$roundName*";
+            $smsMessage = "عزيزي الطالب / الطالبة: " . $studentName . "\n" .
+                "$statusText معاملتك المحولة من قبل منصة نرتقي\n" .
+                "علماً بأن المدفوعات كانت لدورة: $roundName";
 
             // Use the student's registered phone number if available, otherwise the one from confirmation
             $targetPhone = ($confirmation->student && $confirmation->student->phone) 

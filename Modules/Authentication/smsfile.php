@@ -1,23 +1,6 @@
 <?php
 
 /**
- * Wrap a message body with the platform's professional WhatsApp branding
- * (header, footer, dividers). Applied centrally so every outgoing
- * WhatsApp message looks consistent.
- *
- * @param string $body
- * @return string
- */
-function formatWawpMessage(string $body): string
-{
-    $divider = '━━━━━━━━━━━━━━━━━━━━';
-
-    return "🎓 *منصة نرتقي التعليمية*\n{$divider}\n\n"
-        . $body
-        . "\n\n{$divider}\n_رسالة تلقائية، برجاء عدم الرد عليها._";
-}
-
-/**
  * Send WhatsApp message using the Octopus Team API strategy.
  *
  * @param string $phone
@@ -44,12 +27,10 @@ function sendWawpMessage(string $phone, string $message): array
         return ['status' => 'error', 'message' => 'Phone and message are required'];
     }
 
-    $message = formatWawpMessage($message);
-
     // 2. Application Credentials (New Strategy)
     $applications = [
-        [
-            'appkey'  => 'd8040962-4e49-4f74-af76-ff789efbab04',
+         [
+            'appkey'  => 'e77d1e5b-8c5e-4600-bb7d-3489bfd4bea5',
             'authkey' => 'xDpQrRsEJRwARvrGeoTqSVCHF4QpF5i4Dp3fdgVVv0fO2xZGH5'
         ]
     ];
@@ -144,10 +125,6 @@ function sendWawpPdf(string $phone, string $fileUrl, string $fileName, string $c
         return ['status' => 'error', 'message' => 'Phone and file URL are required'];
     }
 
-    if ($caption !== '') {
-        $caption = formatWawpMessage($caption);
-    }
-
     // Log the start of the operation
     $logFile = base_path('Modules/Authentication/wawp_api.log');
     $logMessage = '[' . date('Y-m-d H:i:s') . '] Starting sendWawpPdf for phone: ' . $phone . ', file: ' . $fileName . ', url: ' . $fileUrl . PHP_EOL;
@@ -155,8 +132,8 @@ function sendWawpPdf(string $phone, string $fileUrl, string $fileName, string $c
 
     // 2. Application Credentials (New Strategy)
     $applications = [
-        [
-            'appkey'  => 'd8040962-4e49-4f74-af76-ff789efbab04',
+          [
+            'appkey'  => 'e77d1e5b-8c5e-4600-bb7d-3489bfd4bea5',
             'authkey' => 'xDpQrRsEJRwARvrGeoTqSVCHF4QpF5i4Dp3fdgVVv0fO2xZGH5'
         ]
     ];
