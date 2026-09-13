@@ -1,7 +1,7 @@
 <?php
 // test_wawp_upload.php
 $phone = '201014520135';
-$appkey = '7bf0ec89-5f88-4486-ad2f-3ea7f4068edb';
+$appkey = 'd8040962-4e49-4f74-af76-ff789efbab04';
 $authkey = 'xDpQrRsEJRwARvrGeoTqSVCHF4QpF5i4Dp3fdgVVv0fO2xZGH5';
 
 // Create a small temporary text file renamed as .pdf for testing API acceptance

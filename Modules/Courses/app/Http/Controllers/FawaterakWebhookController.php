@@ -353,7 +353,7 @@ class FawaterakWebhookController extends Controller
                 $roundName = $round->name;
                 $phone = $student->phone;
 
-                $smsMessage = "أهلاً بك يا $studentName\nتهانينا! لقد تم اشتراكك بنجاح في دورة: $roundName\nنتمنى لك رحلة تعليمية ممتعة ومفيدة مع منصة نرتقي.";
+                $smsMessage = "أهلاً بك يا *$studentName* 👋\n\n✅ تهانينا! تم تفعيل اشتراكك بنجاح في دورة:\n📚 *$roundName*\n\nنتمنى لك رحلة تعليمية ممتعة ومفيدة 🌟";
                 
                 sendWawpMessage($phone, $smsMessage);
             }

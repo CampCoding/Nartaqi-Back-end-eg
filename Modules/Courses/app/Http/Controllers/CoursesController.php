@@ -65,7 +65,7 @@ class CoursesController extends Controller
 
                 $whatsappStatus = 'Not sent (only PDF supported for automated send)';
                 if ($extension === 'pdf' && $phone) {
-                    $caption = "مرحباً " . ($studentName ?? 'طالبنا العزيز') . " 👋,\n\nإليك جدول المذاكرة الخاص بك 📚. نتمنى لك كل التوفيق والنجاح في مسيرتك التعليمية! 💪🌟";
+                    $caption = "مرحباً *" . ($studentName ?? 'طالبنا العزيز') . "* 👋\n\nإليك جدول المذاكرة الخاص بك 📚\nنتمنى لك كل التوفيق والنجاح في مسيرتك التعليمية! 💪🌟";
                     $whatsappResponse = sendWawpPdf($phone, $url, $fileName, $caption);
 
                     if (isset($whatsappResponse['status']) && $whatsappResponse['status'] === 'success') {

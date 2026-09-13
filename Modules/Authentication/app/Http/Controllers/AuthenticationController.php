@@ -103,7 +103,7 @@ class AuthenticationController extends Controller
         // إرسال الرسالة للمستخدم
         $result = sendWawpMessage(
             $phone,
-            "رمز تأكيد منصة نرتقي هو: {$code} تنتهي صلاحيته بعد: " . $this->formatMinutesRemaining($expiresAt, $userNow)
+            "🔑 *رمز تأكيد حسابك:* *{$code}*\n⏳ تنتهي صلاحيته خلال: " . $this->formatMinutesRemaining($expiresAt, $userNow)
         );
         // $result = json_decode('رمز تاكيد منصه نرتقي هو : {1231} تنتهي صلاحيه الكود بعد  : {10 دقائق}', true);
 
@@ -212,7 +212,7 @@ class AuthenticationController extends Controller
         // إرسال الرسالة مع حساب الدقائق المتبقية بالنسبة للمستخدم
         $result = sendWawpMessage(
             $phone,
-            "رمز استعادة كلمة المرور: {$code} ينتهي بعد: " . $this->formatMinutesRemaining($expiresAt, $userNow)
+            "🔑 *رمز استعادة كلمة المرور:* *{$code}*\n⏳ ينتهي خلال: " . $this->formatMinutesRemaining($expiresAt, $userNow)
         );
 
         if (isset($result['error'])) {

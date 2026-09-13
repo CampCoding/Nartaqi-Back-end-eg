@@ -1,8 +1,25 @@
 <?php
 
 /**
+ * Wrap a message body with the platform's professional WhatsApp branding
+ * (header, footer, dividers). Applied centrally so every outgoing
+ * WhatsApp message looks consistent.
+ *
+ * @param string $body
+ * @return string
+ */
+function formatWawpMessage(string $body): string
+{
+    $divider = '━━━━━━━━━━━━━━━━━━━━';
+
+    return "🎓 *منصة نرتقي التعليمية*\n{$divider}\n\n"
+        . $body
+        . "\n\n{$divider}\n_رسالة تلقائية، برجاء عدم الرد عليها._";
+}
+
+/**
  * Send WhatsApp message using the Octopus Team API strategy.
- * 
+ *
  * @param string $phone
  * @param string $message
  * @return array
@@ -17,7 +34,7 @@ function sendWawpMessage(string $phone, string $message): array
     // If starts with 0, replace 0 with 2 (e.g., 010 -> 2010)
     if (strpos($phone, '0') === 0) {
         $phone = '2' . $phone;
-    } 
+    }
     // If 10 digits only and doesn't start with 2, add 20
     elseif (strlen($phone) == 10 && strpos($phone, '2') !== 0) {
         $phone = '20' . $phone;
@@ -27,10 +44,12 @@ function sendWawpMessage(string $phone, string $message): array
         return ['status' => 'error', 'message' => 'Phone and message are required'];
     }
 
+    $message = formatWawpMessage($message);
+
     // 2. Application Credentials (New Strategy)
     $applications = [
         [
-            'appkey'  => '7bf0ec89-5f88-4486-ad2f-3ea7f4068edb',
+            'appkey'  => 'd8040962-4e49-4f74-af76-ff789efbab04',
             'authkey' => 'xDpQrRsEJRwARvrGeoTqSVCHF4QpF5i4Dp3fdgVVv0fO2xZGH5'
         ]
     ];
@@ -125,6 +144,10 @@ function sendWawpPdf(string $phone, string $fileUrl, string $fileName, string $c
         return ['status' => 'error', 'message' => 'Phone and file URL are required'];
     }
 
+    if ($caption !== '') {
+        $caption = formatWawpMessage($caption);
+    }
+
     // Log the start of the operation
     $logFile = base_path('Modules/Authentication/wawp_api.log');
     $logMessage = '[' . date('Y-m-d H:i:s') . '] Starting sendWawpPdf for phone: ' . $phone . ', file: ' . $fileName . ', url: ' . $fileUrl . PHP_EOL;
@@ -133,7 +156,7 @@ function sendWawpPdf(string $phone, string $fileUrl, string $fileName, string $c
     // 2. Application Credentials (New Strategy)
     $applications = [
         [
-            'appkey'  => '7bf0ec89-5f88-4486-ad2f-3ea7f4068edb',
+            'appkey'  => 'd8040962-4e49-4f74-af76-ff789efbab04',
             'authkey' => 'xDpQrRsEJRwARvrGeoTqSVCHF4QpF5i4Dp3fdgVVv0fO2xZGH5'
         ]
     ];

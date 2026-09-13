@@ -3,7 +3,7 @@
 $phone = '201014520135';
 $url = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
 
-$appkey = '7bf0ec89-5f88-4486-ad2f-3ea7f4068edb';
+$appkey = 'd8040962-4e49-4f74-af76-ff789efbab04';
 $authkey = 'xDpQrRsEJRwARvrGeoTqSVCHF4QpF5i4Dp3fdgVVv0fO2xZGH5';
 
 function testSend($filenameParam, $filenameValue) {
