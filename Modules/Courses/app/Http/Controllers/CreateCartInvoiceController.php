@@ -102,7 +102,7 @@ class CreateCartInvoiceController extends Controller
                 ];
             }
 
-            $frontendUrl = env('FRONTEND_URL', 'https://nartaqi-user.vercel.app');
+            $frontendUrl = env('FRONTEND_URL', 'https://eg.nartaqi.net');
             $frontendRedirectUrl = rtrim($frontendUrl, '/');
             
             $backendUrl = url('/');

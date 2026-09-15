@@ -179,7 +179,7 @@
         @if(isset($platform) && $platform === 'mobile')
             <p style="margin-top: 10px; font-weight: bold; color: var(--primary);">يمكنك إغلاق هذه الصفحة والعودة إلى التطبيق الآن.</p>
         @else
-            <a href="{{ $frontendRedirect ?? 'https://nartaqi-user.vercel.app' }}" class="btn">
+            <a href="{{ $frontendRedirect ?? 'https://eg.nartaqi.net' }}" class="btn">
                 الانتقال للمنصة في الحال
             </a>
             
@@ -189,7 +189,7 @@
 
     <script>
         @if(!isset($platform) || $platform !== 'mobile')
-        const redirectUrl = "{{ $frontendRedirect ?? 'https://nartaqi-user.vercel.app' }}";
+        const redirectUrl = "{{ $frontendRedirect ?? 'https://eg.nartaqi.net' }}";
         let timeLeft = 10;
         
         const countdownNumberEl = document.getElementById('countdown-number');

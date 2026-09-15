@@ -83,7 +83,7 @@ class CreateInvoiceController extends Controller
 
             $orderId = 'ORD-' . time() . '-' . ($orderData['student_id'] ?? '0');
 
-            $frontendUrl = env('FRONTEND_URL', 'https://nartaqi-user.vercel.app');
+            $frontendUrl = env('FRONTEND_URL', 'https://eg.nartaqi.net');
             $frontendRedirectUrl = rtrim($frontendUrl, '/') . '/course/' . $orderData['round_id'];
             
             $backendUrl = url('/');

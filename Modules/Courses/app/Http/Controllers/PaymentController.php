@@ -237,7 +237,7 @@ class PaymentController extends Controller
     public function paymentCallback(Request $request)
     {
         Log::info("Fawaterak paymentCallback hit", $request->all());
-        $frontendRedirect = env('FRONTEND_URL', 'https://nartaqi-user.vercel.app');
+        $frontendRedirect = env('FRONTEND_URL', 'https://eg.nartaqi.net');
         $invoiceId = $request->query('invoice_id') ?? $request->query('invoiceId'); // From Fawaterak
 
         if ($invoiceId) {
@@ -405,7 +405,7 @@ class PaymentController extends Controller
 
     public function paymentFailed(Request $request)
     {
-        $frontendRedirect = env('FRONTEND_URL', 'https://nartaqi-user.vercel.app');
+        $frontendRedirect = env('FRONTEND_URL', 'https://eg.nartaqi.net');
         $invoiceId = $request->query('invoice_id') ?? $request->query('invoiceId');
 
         if ($invoiceId) {

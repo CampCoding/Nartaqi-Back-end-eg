@@ -179,7 +179,7 @@
         <?php if(isset($platform) && $platform === 'mobile'): ?>
             <p style="margin-top: 10px; font-weight: bold; color: var(--primary);">يمكنك إغلاق هذه الصفحة والعودة إلى التطبيق الآن.</p>
         <?php else: ?>
-            <a href="<?php echo e($frontendRedirect ?? 'https://nartaqi-user.vercel.app'); ?>" class="btn">
+            <a href="<?php echo e($frontendRedirect ?? 'https://eg.nartaqi.net'); ?>" class="btn">
                 الانتقال للمنصة في الحال
             </a>
             
@@ -189,7 +189,7 @@
 
     <script>
         <?php if(!isset($platform) || $platform !== 'mobile'): ?>
-        const redirectUrl = "<?php echo e($frontendRedirect ?? 'https://nartaqi-user.vercel.app'); ?>";
+        const redirectUrl = "<?php echo e($frontendRedirect ?? 'https://eg.nartaqi.net'); ?>";
         let timeLeft = 10;
         
         const countdownNumberEl = document.getElementById('countdown-number');

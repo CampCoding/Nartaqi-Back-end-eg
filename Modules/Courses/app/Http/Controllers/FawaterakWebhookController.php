@@ -181,7 +181,7 @@ class FawaterakWebhookController extends Controller
     public function successCallback(Request $request)
     {
         $invoiceId = $request->query('invoice_id');
-        $frontendRedirect = $request->query('frontend_redirect', env('FRONTEND_URL', 'https://nartaqi-user.vercel.app'));
+        $frontendRedirect = $request->query('frontend_redirect', env('FRONTEND_URL', 'https://eg.nartaqi.net'));
 
         if (!$invoiceId) {
             return view('courses::payment.success', compact('frontendRedirect'));
