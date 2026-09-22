@@ -20,6 +20,7 @@ class Rounds extends Model
         'description',
         'image',
         'active',
+        'reg_allow',
         'course_category_id',
         'price',
         'start_date',

@@ -327,6 +327,7 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('copyRoundContent', [AdminRoundController::class, 'copyRoundContent']);
         Route::post('edit_round', [AdminRoundController::class, 'edit_round']);
         Route::post('active_round', [AdminRoundController::class, 'active_round']);
+        Route::post('toggleRegAllow', [AdminRoundController::class, 'toggleRegAllow']);
         Route::post('delete_round', [AdminRoundController::class, 'delete_round']);
         Route::post('addRoundTerm', [RoundsController::class, 'addRoundTerm']);
         Route::post('editRoundTerm', [RoundsController::class, 'editRoundTerm']);

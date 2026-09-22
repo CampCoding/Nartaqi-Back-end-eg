@@ -11,6 +11,7 @@ use Modules\Courses\Http\Requests\DeleteRoundRequest;
 use Modules\Courses\Http\Requests\GetAllStudentInRoundRequest;
 use Modules\Courses\Http\Requests\ToggleShowRoundBookRequest;
 use Modules\Courses\Http\Requests\ActiveAndInactivRoundRequest;
+use Modules\Courses\Http\Requests\RegAllowRoundRequest;
 use Illuminate\Support\Facades\DB;
 use Modules\Courses\Models\RoundContetModel;
 use Modules\Courses\Models\LessonsModel;
@@ -271,6 +272,17 @@ class AdminRoundController extends Controller
 
         $round->update(['active' => (int) $data['active']]);
         return  res_data('تم تعديل حالة الجولة بنجاح', 'success', 200);
+    }
+
+    public function toggleRegAllow(RegAllowRoundRequest $request)
+    {
+        $round = Rounds::find($request->round_id);
+
+        $round->reg_allow = $round->reg_allow == '1' ? '0' : '1';
+        $round->save();
+
+        $message = $round->reg_allow == '1' ? 'تم إتاحة التسجيل في الدورة بنجاح' : 'تم إيقاف التسجيل في الدورة بنجاح';
+        return res_data($message, 'success', 200);
     }
 
     public function getAllStudentInRound(GetAllStudentInRoundRequest $request)
