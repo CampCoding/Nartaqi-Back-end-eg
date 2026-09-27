@@ -18,6 +18,7 @@ class Rounds extends Model
     protected $fillable = [
         'name',
         'description',
+        'intro_video',
         'image',
         'active',
         'reg_allow',

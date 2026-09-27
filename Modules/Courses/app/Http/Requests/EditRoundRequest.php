@@ -14,6 +14,7 @@ class EditRoundRequest extends FormRequest
             'id' => 'required|exists:rounds,id',
             'name' => 'sometimes|string|max:255',
             'description' => 'nullable',
+            'intro_video' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'price' => 'sometimes|numeric|min:0',
             'start_date' => 'nullable',

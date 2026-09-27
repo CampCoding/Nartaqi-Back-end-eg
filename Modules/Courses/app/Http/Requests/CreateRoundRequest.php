@@ -13,6 +13,7 @@ class CreateRoundRequest extends FormRequest
         return [
             'name' => 'required|string',
             'description' => 'nullable',
+            'intro_video' => 'nullable|string',
             'image' => 'nullable',
             'price' => 'required|numeric|min:0',
             'start_date' => 'nullable',

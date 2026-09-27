@@ -506,7 +506,7 @@ class UserRoundsController extends Controller
                 $roundName = $round->name;
                 $phone = $student->phone;
 
-                $smsMessage = "تم تفعيل اشتراكك في دورة: $roundName .. لمعرفة كيفية متابعة الدورة من خلال المنصة شاهد الفيديو التعريفي https://youtu.be/TkgHJ4GAAYg";
+                $smsMessage = "تم تفعيل اشتراكك في دورة: $roundName .. لمعرفة كيفية متابعة الدورة من خلال المنصة شاهد الفيديو التعريفي https://www.youtube.com/watch?v=dqwkvk7JU_I";
                 
                 sendWawpMessage($phone, $smsMessage);
             }
