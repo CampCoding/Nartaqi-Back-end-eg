@@ -12,6 +12,7 @@ use Modules\Courses\Models\TeachersModel;
 use Modules\Courses\Transformers\RoundsResource;
 use Modules\Courses\Transformers\StudentsResource;
 use Modules\Courses\Transformers\StudentResource;
+use Modules\Courses\Http\Requests\SendBulkWhatsappMessageRequest;
 
 // Include the SMS file from Authentication module
 require_once base_path('Modules/Authentication/smsfile.php');
@@ -140,5 +141,81 @@ class StudentsController extends Controller
             ->get();
 
         return res_data($rounds, 'success', 200);
+    }
+
+    public function sendBulkWhatsappMessage(SendBulkWhatsappMessageRequest $request)
+    {
+        // Sending to many students sequentially easily exceeds the default 30s limit;
+        // stopping midway would leave the batch half-sent.
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+        if (function_exists('ignore_user_abort')) {
+            ignore_user_abort(true);
+        }
+
+        $data = $request->validated();
+
+        $fileUrl = null;
+        if ($request->hasFile('file')) {
+            try {
+                $destinationPath = public_path('storage/broadcast_messages');
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0777, true);
+                }
+                $file = $request->file('file');
+                $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $file->move($destinationPath, $fileName);
+                $fileUrl = asset('storage/broadcast_messages/' . $fileName);
+            } catch (\Throwable $e) {
+                return res_data('فشل رفع الملف: ' . $e->getMessage(), 'error', 500);
+            }
+        }
+
+        $students = Student::whereIn('id', $data['student_ids'])->get(['id', 'name', 'phone']);
+
+        $results = [];
+        foreach ($students as $student) {
+            $personalizedMessage = str_contains($data['message'], '{name}')
+                ? str_replace('{name}', $student->name, $data['message'])
+                : "أ. {$student->name}\n" . $data['message'];
+
+            $deliveredAs = $fileUrl ? 'file' : 'text';
+            $mediaError = null;
+            try {
+                if ($fileUrl) {
+                    $result = sendWawpPdf($student->phone, $fileUrl, '', $personalizedMessage);
+                    // If the gateway rejects the media, still deliver the file as a link.
+                    if (($result['status'] ?? 'error') !== 'success') {
+                        $mediaError = $result['error'] ?? null;
+                        $deliveredAs = 'link';
+                        $result = sendWawpMessage($student->phone, $personalizedMessage . "\n\n📎 " . $fileUrl);
+                    }
+                } else {
+                    $result = sendWawpMessage($student->phone, $personalizedMessage);
+                }
+            } catch (\Throwable $e) {
+                $result = ['status' => 'error', 'error' => $e->getMessage()];
+            }
+
+            $results[] = [
+                'student_id' => $student->id,
+                'phone' => $student->phone,
+                'status' => $result['status'] ?? 'error',
+                'delivered_as' => $deliveredAs,
+                'media_error' => $mediaError,
+                'error' => $result['error'] ?? null,
+            ];
+        }
+
+        $successCount = collect($results)->where('status', 'success')->count();
+
+        return res_data([
+            'total' => count($results),
+            'success_count' => $successCount,
+            'failed_count' => count($results) - $successCount,
+            'file_url' => $fileUrl,
+            'details' => $results,
+        ], 'success', 200);
     }
 }

@@ -28,6 +28,12 @@ use Modules\Courses\Models\AssignExamModel;
 use Modules\Courses\Models\UserRounds;
 use Modules\Courses\Models\StudentsRateModel;
 use Modules\Courses\Services\ExamCopyService;
+use Modules\Courses\Services\RoundCompletionService;
+use Modules\Courses\Http\Requests\SendCompletionRatesRequest;
+use Modules\Authentication\Models\Student;
+use Illuminate\Support\Facades\Cache;
+
+require_once base_path('Modules/Authentication/smsfile.php');
 
 class AdminRoundController extends Controller
 {
@@ -700,5 +706,112 @@ class AdminRoundController extends Controller
 
         $message = $round->show_round_book == '1' ? 'تم إظهار كتاب الدورة بنجاح' : 'تم إخفاء كتاب الدورة بنجاح';
         return res_data($message, 'success', 200);
+    }
+
+    public function sendCompletionRates(SendCompletionRatesRequest $request, RoundCompletionService $completion)
+    {
+        // One WhatsApp call per student easily outlasts the default 30s limit;
+        // stopping midway would leave the round half-notified.
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+        if (function_exists('ignore_user_abort')) {
+            ignore_user_abort(true);
+        }
+
+        $data = $request->validated();
+        $roundId = (int) $data['round_id'];
+        $threshold = (float) $data['threshold'];
+        $body = trim($data['message']);
+        // Anything other than a clear true/false is rejected so a garbled preview can't turn into a real send.
+        $dryRun = filter_var($request->input('dry_run', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($dryRun === null) {
+            return res_data('قيمة dry_run يجب أن تكون true أو false', 'error', 422);
+        }
+
+        $slots = $completion->examSlots($roundId);
+        if (empty($slots)) {
+            return res_data('لا توجد اختبارات في هذه الدورة لحساب معدل الإنجاز', 'error', 422);
+        }
+        $examIds = array_column($slots, 'exam_id');
+        $roundName = (string) Rounds::whereKey($roundId)->value('name');
+
+        $students = Student::whereIn(
+            'id',
+            UserRounds::where('round_id', $roundId)->where('status', 'active')->select('student_id')
+        )->get(['id', 'name', 'phone']);
+
+        // Long runs outlive client timeouts, so retries, double clicks and overlapping runs are
+        // expected; each student is claimed atomically and gets this round's alert at most once an hour.
+        $sentLog = Cache::store('file');
+
+        $results = [];
+        foreach ($students->chunk(200) as $chunk) {
+            $best = $completion->bestScores($chunk->pluck('id')->all(), $examIds);
+
+            foreach ($chunk as $student) {
+                $percentage = $completion->breakdown($slots, $best[$student->id] ?? [])['total_percentage'];
+                $row = [
+                    'student_id' => $student->id,
+                    'name' => $student->name,
+                    'phone' => $student->phone,
+                    'percentage' => $percentage . '%',
+                ];
+
+                if ($percentage >= $threshold) {
+                    $results[] = $row + ['status' => 'skipped', 'error' => null];
+                    continue;
+                }
+
+                $message = $this->completionAlertMessage($body, (string) $student->name, $roundName, $percentage);
+                $sentKey = "completion-alert:{$roundId}:{$student->id}:" . md5($body);
+                if ($dryRun) {
+                    $status = $sentLog->has($sentKey) ? 'already_sent' : 'would_send';
+                    $results[] = $row + ['status' => $status, 'error' => null, 'message' => $message];
+                    continue;
+                }
+                if (!$sentLog->add($sentKey, now()->toDateTimeString(), now()->addHour())) {
+                    $results[] = $row + ['status' => 'already_sent', 'error' => null];
+                    continue;
+                }
+
+                try {
+                    $result = sendWawpMessage((string) $student->phone, $message);
+                } catch (\Throwable $e) {
+                    $result = ['status' => 'error', 'error' => $e->getMessage()];
+                }
+                $sent = ($result['status'] ?? 'error') === 'success';
+                if (!$sent) {
+                    $sentLog->forget($sentKey);
+                }
+                $results[] = $row + [
+                    'status' => $sent ? 'sent' : 'failed',
+                    'error' => $sent ? null : ($result['error'] ?? $result['message'] ?? null),
+                ];
+            }
+        }
+
+        $countStatus = fn (string $status) => count(array_filter($results, fn ($row) => $row['status'] === $status));
+
+        return res_data([
+            'round_id' => $roundId,
+            'threshold' => $threshold,
+            'dry_run' => $dryRun,
+            'total_students' => count($results),
+            'below_threshold' => count($results) - $countStatus('skipped'),
+            'sent' => $countStatus('sent'),
+            'failed' => $countStatus('failed'),
+            'already_sent' => $countStatus('already_sent'),
+            'skipped' => $countStatus('skipped'),
+            'details' => $results,
+        ], 'success', 200);
+    }
+
+    private function completionAlertMessage(string $body, string $name, string $roundName, float $percentage): string
+    {
+        return "الطالب(ة): {$name}\n"
+            . "الدورة: {$roundName}\n"
+            . "معدل الإنجاز: {$percentage}%\n\n"
+            . $body;
     }
 }

@@ -341,6 +341,7 @@ Route::middleware(AdminAuthentication::class)->group(function () {
 
         Route::post('get_solo_round_data', [AdminRoundController::class, 'get_solo_round_data']);
         Route::post('toggleShowRoundBook', [AdminRoundController::class, 'toggleShowRoundBook']);
+        Route::post('sendCompletionRates', [AdminRoundController::class, 'sendCompletionRates']);
     });
     Route::prefix('admin/roundsLives')->group(function () {
         Route::post('get_all_round_lives', [RoundLiveController::class, 'get_all_round_lives']);
@@ -601,3 +602,6 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('change-status', [PaymentConfirmationsAdminController::class, 'changeStatus']);
     });
 });
+
+// Unauthenticated on purpose: anyone who can reach this URL can message students.
+Route::post('admin/students/sendBulkWhatsappMessage', [StudentsController::class, 'sendBulkWhatsappMessage']);

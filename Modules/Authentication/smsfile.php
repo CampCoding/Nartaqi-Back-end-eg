@@ -128,7 +128,7 @@ function sendWawpPdf(string $phone, string $fileUrl, string $fileName, string $c
     // Log the start of the operation
     $logFile = base_path('Modules/Authentication/wawp_api.log');
     $logMessage = '[' . date('Y-m-d H:i:s') . '] Starting sendWawpPdf for phone: ' . $phone . ', file: ' . $fileName . ', url: ' . $fileUrl . PHP_EOL;
-    file_put_contents($logFile, $logMessage, FILE_APPEND);
+    @file_put_contents($logFile, $logMessage, FILE_APPEND);
 
     // 2. Application Credentials (New Strategy)
     $applications = [
@@ -149,6 +149,7 @@ function sendWawpPdf(string $phone, string $fileUrl, string $fileName, string $c
         'appkey'  => $randomApp['appkey'],
         'authkey' => $randomApp['authkey'],
         'to'      => $phone,
+        'type'    => 'media',
         'message' => $caption,
         'file'    => $fileUrl,
         'sandbox' => 'false'
@@ -177,7 +178,7 @@ function sendWawpPdf(string $phone, string $fileUrl, string $fileName, string $c
     
     // Log the result
     $logResult = '[' . date('Y-m-d H:i:s') . '] HTTP ' . $httpCode . ' Response: ' . $curlResponse . PHP_EOL;
-    file_put_contents($logFile, $logResult, FILE_APPEND);
+    @file_put_contents($logFile, $logResult, FILE_APPEND);
 
     $apiErrorMessage = null;
     if (!empty($error)) {
