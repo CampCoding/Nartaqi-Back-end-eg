@@ -7,9 +7,14 @@ use Illuminate\Http\Request;
 use Modules\Courses\Http\Requests\EditRoundLiveRequest;
 use Modules\Courses\Http\Requests\StoreRoundLiveRequest;
 use Modules\Courses\Models\RoundLiveModel;
+use Modules\Courses\Services\RoundLiveNotifier;
 
 class RoundLiveController extends Controller
 {
+    public function __construct(private RoundLiveNotifier $notifier)
+    {
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -29,13 +34,18 @@ class RoundLiveController extends Controller
         if (!$round_live) {
             return res_data('فشل إضافة البث المباشر', 'error', 400);
         }
+        $this->notifier->notifyAfterResponse($round_live);
         return res_data($round_live, 'success', 200);
     }
     public function edit_round_live(EditRoundLiveRequest $request)
     {
         $data = $request->validated();
         $round_live = RoundLiveModel::find($data['id']);
+        $hadLink = filled($round_live->link);
         $round_live->update($data);
+        if (!$hadLink && filled($round_live->link)) {
+            $this->notifier->notifyAfterResponse($round_live, linkJustAdded: true);
+        }
         return res_data($round_live, 'success', 200);
     }
 
