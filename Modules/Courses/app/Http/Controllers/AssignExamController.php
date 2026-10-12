@@ -4,23 +4,24 @@ namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Modules\Courses\Http\Requests\AddExamPdfRequest;
 use Modules\Courses\Http\Requests\AddExamVideoRequest;
 use Modules\Courses\Http\Requests\EditExamPdfRequest;
 use Modules\Courses\Http\Requests\EditExamVideoRequest;
 use Modules\Courses\Models\AdminExamModel;
-use Modules\Courses\Models\AdminExamSectionModel;
-use Modules\Courses\Models\AdminQuestionsModel;
 use Modules\Courses\Models\AssignExamModel;
 use Modules\Courses\Models\ExamPdfsModel;
 use Modules\Courses\Models\ExamVideoModel;
-use Modules\Courses\Models\QuestionAnswersModel;
-use Modules\Courses\Models\QuestionOptionsModel;
-use Modules\Courses\Models\QuestionParagraphsModel;
+use Modules\Courses\Services\ExamCopyService;
 
 class AssignExamController extends Controller
 {
+    public function __construct(private ExamCopyService $examCopyService)
+    {
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -150,105 +151,24 @@ class AssignExamController extends Controller
             'show_date' => 'nullable'
         ]);
 
-        // 1. Get the original exam
-        $originalExam = AdminExamModel::findOrFail($data['exam_id']);
+        // Copy the exam (sections, paragraphs, questions, options, answers) and assign the copy,
+        // all or nothing, so a failure can't leave a half-copied exam behind.
+        $assign_exam_round = DB::transaction(function () use ($data) {
+            $examIdMap = [];
+            $newExam = $this->examCopyService->copyExamWithQuestions((int) $data['exam_id'], $examIdMap);
 
-        // 2. Create a copy of the exam
-        $newExam = $originalExam->replicate();
-        $newExam->from_copy = '1';
-        $newExam->save();
+            $maxSort = AssignExamModel::where('lesson_or_round_id', $data['lesson_or_round_id'])
+                ->where('type', $data['type'])
+                ->max('sort_number');
 
-        // 3. Get all sections from the original exam
-        $originalSections = AdminExamSectionModel::where('exam_id', $originalExam->id)->get();
-
-        foreach ($originalSections as $originalSection) {
-            // 4. Create a copy of each section
-            $newSection = $originalSection->replicate();
-            $newSection->exam_id = $newExam->id;
-            $newSection->save();
-
-            // Map to store old paragraph ID => new paragraph ID
-            $paragraphIdMap = [];
-
-            // Copy questions for this section
-            $originalQuestions = AdminQuestionsModel::where('exam_section_id', $originalSection->id)->get();
-
-            foreach ($originalQuestions as $originalQuestion) {
-                // Map to store old option ID => new option ID
-                $optionIdMap = [];
-
-                // Create a copy of the question
-                $newQuestion = $originalQuestion->replicate();
-                $newQuestion->exam_section_id = $newSection->id;
-
-                // Copy paragraph if this question references one and it hasn't been copied yet
-                if ($originalQuestion->paragraph_id) {
-                    // Check if we've already copied this paragraph
-                    if (!isset($paragraphIdMap[$originalQuestion->paragraph_id])) {
-                        // Get the original paragraph
-                        $originalParagraph = QuestionParagraphsModel::find($originalQuestion->paragraph_id);
-
-                        if ($originalParagraph) {
-                            // Create a copy of the paragraph
-                            $newParagraph = new QuestionParagraphsModel();
-                            $newParagraph->exam_section_id = $newSection->id;
-                            $newParagraph->paragraph_content = $originalParagraph->paragraph_content;
-                            $newParagraph->save();
-
-                            // Store mapping
-                            $paragraphIdMap[$originalQuestion->paragraph_id] = $newParagraph->id;
-                        }
-                    }
-
-                    // Update question's paragraph_id to the new copied paragraph
-                    if (isset($paragraphIdMap[$originalQuestion->paragraph_id])) {
-                        $newQuestion->paragraph_id = $paragraphIdMap[$originalQuestion->paragraph_id];
-                    }
-                }
-
-                $newQuestion->save();
-
-                // 7. Copy question options
-                $originalOptions = QuestionOptionsModel::where('question_id', $originalQuestion->id)->get();
-                foreach ($originalOptions as $originalOption) {
-                    $newOption = $originalOption->replicate();
-                    $newOption->question_id = $newQuestion->id;
-                    $newOption->save();
-
-                    // Store mapping for answer reference
-                    $optionIdMap[$originalOption->id] = $newOption->id;
-                }
-
-                // 8. Copy question answer and update correct_option_id reference
-                $originalAnswer = QuestionAnswersModel::where('question_id', $originalQuestion->id)->first();
-                if ($originalAnswer) {
-                    $newAnswer = $originalAnswer->replicate();
-                    $newAnswer->question_id = $newQuestion->id;
-
-                    // Update correct_option_id to point to the new option
-                    if ($originalAnswer->correct_option_id && isset($optionIdMap[$originalAnswer->correct_option_id])) {
-                        $newAnswer->correct_option_id = $optionIdMap[$originalAnswer->correct_option_id];
-                    }
-
-                    $newAnswer->save();
-                }
-            }
-        }
-
-        // 9. Calculate sort_number based on lesson_or_round_id and type
-        $maxSort = AssignExamModel::where('lesson_or_round_id', $data['lesson_or_round_id'])
-            ->where('type', $data['type'])
-            ->max('sort_number');
-        $sortNumber = $maxSort ? $maxSort + 1 : 1;
-
-        // 10. Assign the new exam to the round/lesson
-        $assign_exam_round = AssignExamModel::create([
-            'type' => $data['type'],
-            'exam_id' => $newExam->id,
-            'lesson_or_round_id' => $data['lesson_or_round_id'],
-            'show_date' => $data['show_date'],
-            'sort_number' => $sortNumber
-        ]);
+            return AssignExamModel::create([
+                'type' => $data['type'],
+                'exam_id' => $newExam->id,
+                'lesson_or_round_id' => $data['lesson_or_round_id'],
+                'show_date' => $data['show_date'] ?? null,
+                'sort_number' => $maxSort ? $maxSort + 1 : 1,
+            ]);
+        });
 
         return res_data($assign_exam_round, 'تم نسخ الامتحان و تعيينه بنجاح', 200);
     }
