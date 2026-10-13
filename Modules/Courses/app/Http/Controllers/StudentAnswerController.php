@@ -12,6 +12,9 @@ use Modules\Courses\Models\StudentMockExamScratchModel;
 use Modules\Courses\Models\StudentScoreModel;
 use Modules\Courses\Models\ExamSectionsModel;
 use Modules\Courses\Models\AdminExamModel;
+use Modules\Courses\Models\StudentFolderExamModel;
+use Modules\Courses\Models\StudentFolderExamQuestionModel;
+use Modules\Courses\Models\StudentFolderExamAnswerModel;
 
 class StudentAnswerController extends Controller
 {
@@ -232,7 +235,8 @@ class StudentAnswerController extends Controller
     public function getExamSummaryReport(Request $request)
     {
         $data = $request->validate([
-            'exam_id' => 'required|exists:exams,id',
+            'exam_id' => 'required_without:folder_exam_id|nullable|exists:exams,id',
+            'folder_exam_id' => 'required_without:exam_id|nullable|integer',
             'student_id' => 'nullable|exists:students,id',
         ]);
 
@@ -240,6 +244,10 @@ class StudentAnswerController extends Controller
 
         if (!$studentId) {
             return res_data(null, 'معرف الطالب مطلوب (student_id في Body أو Token في الهيدر)', 400);
+        }
+
+        if (!empty($data['folder_exam_id'])) {
+            return $this->folderExamSummaryReport((int) $data['folder_exam_id'], (int) $studentId);
         }
 
         // Fetch Exam details
@@ -263,6 +271,93 @@ class StudentAnswerController extends Controller
             ->get()
             ->keyBy('question_id');
 
+        // Fetch latest student score record if exists
+        $studentScoreRecord = StudentScoreModel::where('exam_id', $exam->id)
+            ->where('student_id', $studentId)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $storedScore = $studentScoreRecord && is_numeric(str_replace('%', '', $studentScoreRecord->score))
+            ? (float) str_replace('%', '', $studentScoreRecord->score)
+            : null;
+
+        $sectionGroups = $sections->map(fn ($section) => [
+            'id' => $section->id,
+            'title' => $section->title,
+            'description' => $section->description,
+            'level' => $section->level,
+            'questions' => $questions->where('exam_section_id', $section->id),
+        ])->all();
+
+        return $this->buildExamSummaryReport([
+            'exam_id' => $exam->id,
+            'exam_title' => $exam->title,
+            'exam_label' => $exam->examLabel?->name ?? 'اختبار تدريبي',
+            'level' => $exam->level,
+            'success_percentage' => $exam->success_percentage,
+        ], $sectionGroups, $questions, $studentAnswers, $storedScore);
+    }
+
+    /**
+     * Summary report for an exam the student generated from one of their question folders.
+     * Same response shape as a regular exam's report, with the folder exam as a single section.
+     */
+    private function folderExamSummaryReport(int $folderExamId, int $studentId)
+    {
+        $folderExam = StudentFolderExamModel::where('student_id', $studentId)
+            ->where('id', $folderExamId)
+            ->first();
+
+        if (!$folderExam) {
+            return res_data(null, 'الاختبار غير موجود', 404);
+        }
+
+        $orderedQuestionIds = StudentFolderExamQuestionModel::where('folder_exam_id', $folderExam->id)
+            ->orderBy('sort_order')
+            ->pluck('question_id');
+
+        $questions = AdminQuestionsModel::whereIn('id', $orderedQuestionIds)
+            ->with(['options', 'paragraph', 'exam_section'])
+            ->get()
+            ->sortBy(fn ($q) => $orderedQuestionIds->search($q->id))
+            ->values();
+
+        $answers = StudentFolderExamAnswerModel::where('folder_exam_id', $folderExam->id)
+            ->get()
+            ->keyBy('question_id');
+
+        // Folder answers store the chosen option id; the report shows the chosen option's text.
+        foreach ($answers as $answer) {
+            if ($answer->student_answer === null && $answer->selected_option_id) {
+                $answer->student_answer = $questions->firstWhere('id', $answer->question_id)
+                    ?->options->firstWhere('id', $answer->selected_option_id)
+                    ?->option_text;
+            }
+        }
+
+        return $this->buildExamSummaryReport([
+            'exam_id' => $folderExam->id,
+            'folder_exam_id' => $folderExam->id,
+            'exam_title' => $folderExam->title,
+            'exam_label' => 'اختبار من المجلد',
+            'level' => null,
+            'success_percentage' => null,
+        ], [[
+            'id' => $folderExam->id,
+            'title' => $folderExam->title,
+            'description' => null,
+            'level' => null,
+            'questions' => $questions,
+        ]], $questions, $answers, null);
+    }
+
+    /**
+     * Builds the performance report payload (overall score, difficulty breakdown, per-section
+     * question details) from section groups, the student's answers keyed by question_id, and an
+     * optional stored score percentage that overrides the computed one.
+     */
+    private function buildExamSummaryReport(array $examInfo, array $sectionGroups, $questions, $studentAnswers, ?float $storedScore)
+    {
         // Fetch overall performance stats for all questions across ALL students to dynamically determine difficulty
         $overallQuestionStats = StudentAnswerModel::whereIn('question_id', $questions->pluck('id'))
             ->select(
@@ -273,12 +368,6 @@ class StudentAnswerController extends Controller
             ->groupBy('question_id')
             ->get()
             ->keyBy('question_id');
-
-        // Fetch latest student score record if exists
-        $studentScoreRecord = StudentScoreModel::where('exam_id', $exam->id)
-            ->where('student_id', $studentId)
-            ->orderBy('id', 'desc')
-            ->first();
 
         // Global counters
         $totalQuestionsCount = $questions->count();
@@ -333,8 +422,8 @@ class StudentAnswerController extends Controller
             16 => 'السادس عشر', 17 => 'السابع عشر', 18 => 'الثامن عشر', 19 => 'التاسع عشر', 20 => 'العشرون'
         ];
 
-        foreach ($sections as $section) {
-            $sectionQuestions = $questions->where('exam_section_id', $section->id);
+        foreach ($sectionGroups as $section) {
+            $sectionQuestions = $section['questions'];
             $secCorrect = 0;
             $secWrong = 0;
             $secUnanswered = 0;
@@ -379,7 +468,10 @@ class StudentAnswerController extends Controller
                     }
                 } else {
                     // Fallback to static level on question/section if no answers recorded yet
-                    $rawLevel = $q->level ?? $section->level ?? 'unspecified';
+                    $rawLevel = $q->level
+                        ?? $section['level']
+                        ?? ($q->relationLoaded('exam_section') ? $q->exam_section?->level : null)
+                        ?? 'unspecified';
                     $diffKey = match (strtolower((string)$rawLevel)) {
                         'easy', 'سهل' => 'easy',
                         'medium', 'متوسط' => 'medium',
@@ -443,9 +535,9 @@ class StudentAnswerController extends Controller
             }
 
             $sectionsPerformance[] = [
-                'section_id' => $section->id,
-                'section_title' => $section->title,
-                'section_description' => $section->description,
+                'section_id' => $section['id'],
+                'section_title' => $section['title'],
+                'section_description' => $section['description'],
                 'section_subtitle' => "{$secCorrect} صحيحة من {$secTotal}",
                 'stats' => [
                     'correct_count' => $secCorrect,
@@ -482,9 +574,9 @@ class StudentAnswerController extends Controller
             ? round(($correctAnswersCount / $totalQuestionsCount) * 100, 2)
             : 0;
 
-        // If student score record exists, use that if score string is present
-        if ($studentScoreRecord && is_numeric(str_replace('%', '', $studentScoreRecord->score))) {
-            $scorePercentage = (float) str_replace('%', '', $studentScoreRecord->score);
+        // If a stored score exists, it takes precedence over the computed one
+        if ($storedScore !== null) {
+            $scorePercentage = $storedScore;
         }
 
         // Status recommendations based on percentage
@@ -500,13 +592,7 @@ class StudentAnswerController extends Controller
         }
 
         return res_data([
-            'exam_info' => [
-                'exam_id' => $exam->id,
-                'exam_title' => $exam->title,
-                'exam_label' => $exam->examLabel?->name ?? 'اختبار تدريبي',
-                'level' => $exam->level,
-                'success_percentage' => $exam->success_percentage,
-            ],
+            'exam_info' => $examInfo,
             'overall_result' => [
                 'score_percentage' => "{$scorePercentage}%",
                 'score_percentage_number' => $scorePercentage,

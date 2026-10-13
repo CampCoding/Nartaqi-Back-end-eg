@@ -10,6 +10,9 @@ use Modules\Courses\Models\AssignExamModel;
 use Modules\Courses\Models\LessonsModel;
 use Modules\Courses\Models\RoundContetModel;
 use Modules\Courses\Models\Rounds;
+use Modules\Courses\Models\StudentFolderExamModel;
+use Modules\Courses\Models\StudentFolderExamQuestionModel;
+use Modules\Courses\Models\StudentFolderExamScratchModel;
 use Modules\Courses\Models\StudentMockExamScratchModel;
 use Modules\Courses\Models\UserRounds;
 
@@ -23,19 +26,25 @@ class MockExamScratchController extends Controller
     public function save(Request $request)
     {
         $data = $request->validate([
-            'exam_id' => 'required|integer|exists:exams,id',
+            'exam_id' => 'required_without:folder_exam_id|nullable|integer|exists:exams,id',
+            'folder_exam_id' => 'required_without:exam_id|nullable|integer',
             'question_id' => 'required|integer|exists:questions,id',
             'scratch_data' => 'required|array',
         ]);
 
         $studentId = $request->user()->id;
-        $examId = (int) $data['exam_id'];
         $questionId = (int) $data['question_id'];
         $scratchData = $data['scratch_data'];
 
         if (strlen(json_encode($scratchData)) > self::MAX_PAYLOAD_BYTES) {
             return res_data('حجم المسودة أكبر من المسموح', 'error', 413);
         }
+
+        if (!empty($data['folder_exam_id'])) {
+            return $this->saveFolderExamScratch($studentId, (int) $data['folder_exam_id'], $questionId, $scratchData);
+        }
+
+        $examId = (int) $data['exam_id'];
 
         $questionBelongsToExam = AdminQuestionsModel::where('id', $questionId)
             ->whereHas('exam_section', fn ($q) => $q->where('exam_id', $examId))
@@ -60,6 +69,44 @@ class MockExamScratchController extends Controller
 
         $scratch = StudentMockExamScratchModel::updateOrCreate(
             ['student_id' => $studentId, 'exam_id' => $examId, 'question_id' => $questionId],
+            ['scratch_data' => $scratchData]
+        );
+
+        return res_data($scratch, 'success', 200);
+    }
+
+    private function saveFolderExamScratch(int $studentId, int $folderExamId, int $questionId, array $scratchData)
+    {
+        $folderExam = StudentFolderExamModel::where('student_id', $studentId)
+            ->where('id', $folderExamId)
+            ->first();
+
+        if (!$folderExam) {
+            return res_data('الاختبار غير موجود', 'error', 404);
+        }
+
+        if ($folderExam->status === 'completed') {
+            return res_data('لا يمكن تعديل المسودة بعد إنهاء الاختبار', 'error', 422);
+        }
+
+        $questionInExam = StudentFolderExamQuestionModel::where('folder_exam_id', $folderExam->id)
+            ->where('question_id', $questionId)
+            ->exists();
+
+        if (!$questionInExam) {
+            return res_data('السؤال لا يتبع هذا الامتحان', 'error', 422);
+        }
+
+        if ($this->isScratchEmpty($scratchData)) {
+            StudentFolderExamScratchModel::where('folder_exam_id', $folderExam->id)
+                ->where('question_id', $questionId)
+                ->delete();
+
+            return res_data(null, 'success', 200);
+        }
+
+        $scratch = StudentFolderExamScratchModel::updateOrCreate(
+            ['folder_exam_id' => $folderExam->id, 'question_id' => $questionId],
             ['scratch_data' => $scratchData]
         );
 

@@ -11,6 +11,7 @@ use Modules\Courses\Models\StudentQuestionFolderItemModel;
 use Modules\Courses\Models\StudentFolderExamModel;
 use Modules\Courses\Models\StudentFolderExamQuestionModel;
 use Modules\Courses\Models\StudentFolderExamAnswerModel;
+use Modules\Courses\Models\StudentFolderExamScratchModel;
 use Modules\Courses\Models\QuestionOptionsModel;
 
 class StudentQuestionFolderController extends Controller
@@ -357,6 +358,10 @@ class StudentQuestionFolderController extends Controller
             ->get()
             ->keyBy('question_id');
 
+        $scratches = StudentFolderExamScratchModel::where('folder_exam_id', $folderExam->id)
+            ->get()
+            ->keyBy('question_id');
+
         return res_data([
             'exam_info' => [
                 'id' => $folderExam->id,
@@ -369,7 +374,7 @@ class StudentQuestionFolderController extends Controller
                 [
                     'id' => $folderExam->id,
                     'title' => $folderExam->title,
-                    'questions' => $this->formatQuestions($questions, $answers),
+                    'questions' => $this->formatQuestions($questions, $answers, $scratches),
                 ],
             ],
         ], 'success', 200);
@@ -466,6 +471,9 @@ class StudentQuestionFolderController extends Controller
             'finished_at' => now(),
         ]);
 
+        // Scratch pads only serve the attempt in progress, same as mock exams.
+        StudentFolderExamScratchModel::where('folder_exam_id', $folderExam->id)->delete();
+
         return res_data($folderExam, 'success', 200);
     }
 
@@ -473,7 +481,7 @@ class StudentQuestionFolderController extends Controller
      * Shared formatter: groups paragraph_mcq questions under their paragraph
      * (same convention as ExamSectionsController::get_mock_exam_sectionsWithQuestions).
      */
-    private function formatQuestions($questions, $answers = null)
+    private function formatQuestions($questions, $answers = null, $scratches = null)
     {
         $formatted = [];
         $processedParagraphIds = [];
@@ -498,23 +506,23 @@ class StudentQuestionFolderController extends Controller
                         'voice' => $paragraphModel->voice,
                         'description' => $paragraphModel->description,
                     ] : null,
-                    'questions' => $paragraphQuestions->map(function ($q) use ($answers) {
-                        return $this->formatSingleQuestion($q, $answers);
+                    'questions' => $paragraphQuestions->map(function ($q) use ($answers, $scratches) {
+                        return $this->formatSingleQuestion($q, $answers, $scratches);
                     })->values()->toArray(),
                 ];
             } else {
-                $formatted[] = $this->formatSingleQuestion($question, $answers);
+                $formatted[] = $this->formatSingleQuestion($question, $answers, $scratches);
             }
         }
 
         return $formatted;
     }
 
-    private function formatSingleQuestion($question, $answers = null)
+    private function formatSingleQuestion($question, $answers = null, $scratches = null)
     {
         $answer = $answers ? $answers->get($question->id) : null;
 
-        return [
+        $formatted = [
             'id' => $question->id,
             'question_text' => $question->question_text,
             'question_type' => $question->question_type,
@@ -527,5 +535,11 @@ class StudentQuestionFolderController extends Controller
             'is_correct' => $answer->is_correct ?? null,
             'is_solved' => $answer ? true : false,
         ];
+
+        if ($scratches !== null) {
+            $formatted['scratch_data'] = $scratches->get($question->id)->scratch_data ?? null;
+        }
+
+        return $formatted;
     }
 }
