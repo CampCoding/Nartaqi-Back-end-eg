@@ -5,6 +5,7 @@ namespace Modules\Courses\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Modules\Courses\Http\Requests\AddQuestionRequest;
 use Modules\Courses\Http\Requests\AddParagraphQuestionRequest;
 use Modules\Courses\Http\Requests\GetQuestionsRequest;
@@ -414,26 +415,7 @@ class AdminQuestionsController extends Controller
                 $selectedBankQuestions = $availableBankQuestions->random($questionsCount);
 
                 foreach ($selectedBankQuestions as $bankQuestion) {
-                    // Create exam question
-                    $adminQuestion = AdminQuestionsModel::create([
-                        'exam_section_id' => $sectionId,
-                        'question_text' => $bankQuestion->question_text,
-                        'question_type' => 'mcq',
-                        'instructions' => $bankQuestion->instructions,
-                        'paragraph_id' => null,
-                    ]);
-
-                    // Copy question options
-                    foreach ($bankQuestion->options as $option) {
-                        QuestionOptionsModel::create([
-                            'question_id' => $adminQuestion->id,
-                            'option_text' => $option->option_text,
-                            'is_correct' => $option->is_correct ? '1' : '0',
-                            'question_explanation' => '',
-                        ]);
-                    }
-
-                    $copiedQuestions[] = $adminQuestion;
+                    $copiedQuestions[] = $this->copyBankQuestionToSection($bankQuestion, (int) $sectionId);
                 }
             }
 
@@ -472,34 +454,7 @@ class AdminQuestionsController extends Controller
                 $selectedBankParagraphs = $availableBankParagraphs->random($paragraphsCount);
 
                 foreach ($selectedBankParagraphs as $bankParagraph) {
-                    // Create exam paragraph
-                    $adminParagraph = QuestionParagraphsModel::create([
-                        'exam_section_id' => $sectionId,
-                        'paragraph_content' => $bankParagraph->paragraph_content,
-                    ]);
-
-                    // Copy questions for this paragraph
-                    foreach ($bankParagraph->questions as $bankQuestion) {
-                        $adminQuestion = AdminQuestionsModel::create([
-                            'exam_section_id' => $sectionId,
-                            'question_text' => $bankQuestion->question_text,
-                            'question_type' => 'paragraph_mcq',
-                            'instructions' => $bankQuestion->instructions,
-                            'paragraph_id' => $adminParagraph->id,
-                        ]);
-
-                        // Copy options
-                        foreach ($bankQuestion->options as $option) {
-                            QuestionOptionsModel::create([
-                                'question_id' => $adminQuestion->id,
-                                'option_text' => $option->option_text,
-                                'is_correct' => $option->is_correct ? '1' : '0',
-                                'question_explanation' => '',
-                            ]);
-                        }
-                    }
-
-                    $copiedParagraphs[] = $adminParagraph;
+                    $copiedParagraphs[] = $this->copyBankParagraphToSection($bankParagraph, (int) $sectionId);
                 }
             }
 
@@ -516,6 +471,163 @@ class AdminQuestionsController extends Controller
             Log::error('makeAutoGenerateQuestions Error: ' . $e->getMessage());
             return res_data($e->getMessage(), 'error', 500);
         }
+    }
+
+    /**
+     * Search the question bank within a skill so the admin can hand-pick questions (type=mcq)
+     * or whole paragraphs (type=paragraph) to copy into an exam section.
+     */
+    public function searchBankQuestions(Request $request)
+    {
+        $data = $request->validate([
+            'question_bank_skills_id' => 'required|exists:question_bank_skills,id',
+            'type' => 'nullable|in:mcq,paragraph',
+            'search' => 'nullable|string|max:255',
+            'exam_section_id' => 'nullable|exists:exam_sections,id',
+            'per_page' => 'nullable|integer|min:1|max:200',
+        ]);
+
+        $type = $data['type'] ?? 'mcq';
+        $perPage = (int) ($data['per_page'] ?? 20);
+        $sectionId = $data['exam_section_id'] ?? null;
+        $like = filled($data['search'] ?? null)
+            ? '%' . addcslashes($data['search'], '\\%_') . '%'
+            : null;
+
+        if ($type === 'paragraph') {
+            $results = QuestionBankParagraphModel::with('questions.options')
+                ->where('question_bank_skills_id', $data['question_bank_skills_id'])
+                ->when($like, fn ($q) => $q->where(function ($w) use ($like) {
+                    $w->where('paragraph_content', 'like', $like)
+                        ->orWhereHas('questions', fn ($qq) => $qq->where('question_text', 'like', $like));
+                }))
+                ->orderBy('id', 'desc')
+                ->paginate($perPage);
+
+            $usedInSection = $sectionId
+                ? array_flip(QuestionParagraphsModel::where('exam_section_id', $sectionId)
+                    ->whereNotNull('paragraph_content')->pluck('paragraph_content')->all())
+                : [];
+
+            $results->getCollection()->each(function ($paragraph) use ($usedInSection) {
+                $paragraph->already_in_section = isset($usedInSection[$paragraph->paragraph_content]);
+            });
+
+            return res_data($results, 'success', 200);
+        }
+
+        $results = QuestionsBankModel::with('options')
+            ->where('question_bank_skills_id', $data['question_bank_skills_id'])
+            ->where('type', 'mcq')
+            ->when($like, fn ($q) => $q->where(function ($w) use ($like) {
+                $w->where('question_text', 'like', $like)->orWhere('instructions', 'like', $like);
+            }))
+            ->orderBy('id', 'desc')
+            ->paginate($perPage);
+
+        $usedInSection = $sectionId
+            ? array_flip(AdminQuestionsModel::where('exam_section_id', $sectionId)
+                ->whereNull('paragraph_id')->whereNotNull('question_text')->pluck('question_text')->all())
+            : [];
+
+        $results->getCollection()->each(function ($question) use ($usedInSection) {
+            $question->already_in_section = isset($usedInSection[$question->question_text]);
+        });
+
+        return res_data($results, 'success', 200);
+    }
+
+    /**
+     * Copy hand-picked bank questions and/or whole bank paragraphs into an exam section, the same
+     * way makeAutoGenerateQuestions copies them. The bank originals are left untouched.
+     */
+    public function addBankQuestionsToSection(Request $request)
+    {
+        $data = $request->validate([
+            'exam_section_id' => 'required|exists:exam_sections,id',
+            'question_ids' => 'nullable|array',
+            'question_ids.*' => 'integer|distinct|exists:questions_bank,id',
+            'paragraph_ids' => 'nullable|array',
+            'paragraph_ids.*' => 'integer|distinct|exists:question_bank_paragraphs,id',
+        ]);
+
+        $questionIds = collect($data['question_ids'] ?? [])->map(fn ($id) => (int) $id)->values();
+        $paragraphIds = collect($data['paragraph_ids'] ?? [])->map(fn ($id) => (int) $id)->values();
+
+        if ($questionIds->isEmpty() && $paragraphIds->isEmpty()) {
+            return res_data(null, 'اختر سؤالاً أو قطعة واحدة على الأقل', 422);
+        }
+
+        $bankQuestions = QuestionsBankModel::with('options')
+            ->whereIn('id', $questionIds)
+            ->where('type', 'mcq')
+            ->get()
+            ->sortBy(fn ($q) => $questionIds->search($q->id))
+            ->values();
+
+        // A paragraph's questions only make sense with their paragraph, so they're added via paragraph_ids.
+        if ($bankQuestions->count() !== $questionIds->count()) {
+            return res_data(null, 'بعض الأسئلة المختارة تابعة لقطعة؛ أضف القطعة كاملة من paragraph_ids', 422);
+        }
+
+        $bankParagraphs = QuestionBankParagraphModel::with('questions.options')
+            ->whereIn('id', $paragraphIds)
+            ->get()
+            ->sortBy(fn ($p) => $paragraphIds->search($p->id))
+            ->values();
+
+        $sectionId = (int) $data['exam_section_id'];
+
+        [$newQuestions, $newParagraphs] = DB::transaction(function () use ($bankQuestions, $bankParagraphs, $sectionId) {
+            $newQuestions = $bankQuestions->map(fn ($q) => $this->copyBankQuestionToSection($q, $sectionId));
+            $newParagraphs = $bankParagraphs->map(fn ($p) => $this->copyBankParagraphToSection($p, $sectionId));
+
+            return [$newQuestions, $newParagraphs];
+        });
+
+        return res_data([
+            'exam_section_id' => $sectionId,
+            'questions_count' => $newQuestions->count(),
+            'paragraphs_count' => $newParagraphs->count(),
+            'question_ids' => $newQuestions->pluck('id'),
+            'paragraph_ids' => $newParagraphs->pluck('id'),
+        ], 'تم إضافة الأسئلة للاختبار بنجاح', 201);
+    }
+
+    private function copyBankQuestionToSection($bankQuestion, int $sectionId, ?int $paragraphId = null): AdminQuestionsModel
+    {
+        $question = AdminQuestionsModel::create([
+            'exam_section_id' => $sectionId,
+            'question_text' => $bankQuestion->question_text,
+            'question_type' => $paragraphId ? 'paragraph_mcq' : 'mcq',
+            'instructions' => $bankQuestion->instructions,
+            'paragraph_id' => $paragraphId,
+        ]);
+
+        foreach ($bankQuestion->options as $option) {
+            QuestionOptionsModel::create([
+                'question_id' => $question->id,
+                'option_text' => $option->option_text,
+                'is_correct' => $option->is_correct ? '1' : '0',
+                'question_explanation' => '',
+            ]);
+        }
+
+        return $question;
+    }
+
+    private function copyBankParagraphToSection($bankParagraph, int $sectionId): QuestionParagraphsModel
+    {
+        $paragraph = QuestionParagraphsModel::create([
+            'exam_section_id' => $sectionId,
+            'paragraph_content' => $bankParagraph->paragraph_content,
+        ]);
+
+        foreach ($bankParagraph->questions as $bankQuestion) {
+            $this->copyBankQuestionToSection($bankQuestion, $sectionId, $paragraph->id);
+        }
+
+        return $paragraph;
     }
 
     public function uploadAudio(Request $request)

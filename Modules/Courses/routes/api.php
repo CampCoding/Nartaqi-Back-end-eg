@@ -277,6 +277,8 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('editParagraphQuestions', [AdminQuestionsController::class, 'editParagraphQuestions']);
         Route::post('deleteParagraphQuestions', [AdminQuestionsController::class, 'deleteParagraphQuestions']);
         Route::post('makeAutoGenerateQuestions', [AdminQuestionsController::class, 'makeAutoGenerateQuestions']);
+        Route::post('searchBankQuestions', [AdminQuestionsController::class, 'searchBankQuestions']);
+        Route::post('addBankQuestionsToSection', [AdminQuestionsController::class, 'addBankQuestionsToSection']);
         Route::post('upload_audio', [AdminQuestionsController::class, 'uploadAudio']);
     });
 });
