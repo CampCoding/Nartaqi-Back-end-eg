@@ -47,12 +47,10 @@ class CreateInvoiceController extends Controller
             }
 
             if ($couponCode) {
-                $couponQuery = \Modules\Courses\Models\Coupon::where('code', strtoupper($couponCode))
-                    ->where('is_active', true)
-                    ->where('target', 'rounds');
-
-                $coupon = (clone $couponQuery)->where('round_id', $orderData['round_id'])->first()
-                    ?? (clone $couponQuery)->whereNull('round_id')->first();
+                $coupon = \Modules\Courses\Models\Coupon::findForRound($couponCode, $orderData['round_id']);
+                if ($coupon && !$coupon->is_active) {
+                    $coupon = null;
+                }
 
                 if ($coupon && $coupon->isValidFor('rounds', $orderData['round_id'])) {
                     // Do not perform discount subtraction since it is already applied on the frontend.

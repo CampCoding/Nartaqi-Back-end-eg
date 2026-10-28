@@ -108,12 +108,10 @@ class FawaterakWebhookController extends Controller
                 // Increment coupon usage if used, but only if we didn't already process this payment
                 if ($couponCode && !$isAlreadyPaid) {
                     try {
-                        $couponQuery = Coupon::where('code', $couponCode);
                         if ($transaction && $transaction->round_id) {
-                            $coupon = (clone $couponQuery)->where('target', 'rounds')->where('round_id', $transaction->round_id)->first()
-                                ?? (clone $couponQuery)->where('target', 'rounds')->whereNull('round_id')->first();
+                            $coupon = Coupon::findForRound($couponCode, $transaction->round_id);
                         } else {
-                            $coupon = $couponQuery->where('target', 'store')->first();
+                            $coupon = Coupon::where('code', $couponCode)->where('target', 'store')->first();
                         }
                         if ($coupon) {
                             $coupon->increment('used_count');
@@ -232,12 +230,10 @@ class FawaterakWebhookController extends Controller
 
                         // Increment coupon usage if used
                         if ($couponCode && !$isAlreadyPaid) {
-                            $couponQuery = Coupon::where('code', $couponCode);
                             if ($roundId) {
-                                $couponExists = (clone $couponQuery)->where('target', 'rounds')->where('round_id', $roundId)->first()
-                                    ?? (clone $couponQuery)->where('target', 'rounds')->whereNull('round_id')->first();
+                                $couponExists = Coupon::findForRound($couponCode, $roundId);
                             } else {
-                                $couponExists = $couponQuery->where('target', 'store')->first();
+                                $couponExists = Coupon::where('code', $couponCode)->where('target', 'store')->first();
                             }
 
                             if ($couponExists && !Coupon::where('id', $couponExists->id)->where('updated_at', '>=', now()->subMinutes(5))->exists()) {

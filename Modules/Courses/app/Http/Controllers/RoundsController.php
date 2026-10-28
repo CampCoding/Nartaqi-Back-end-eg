@@ -31,6 +31,8 @@ use Modules\Courses\Models\FreeVideosModel;
 use Modules\Courses\Models\StudentView;
 use Modules\Courses\Models\RoundResourceLinks;
 use Modules\Courses\Models\StudentAchievementResultsModel;
+use Modules\Courses\Models\Coupon;
+use Illuminate\Support\Facades\Schema;
 
 class RoundsController extends Controller
 {
@@ -605,16 +607,28 @@ class RoundsController extends Controller
             ? round($roundTotalRates / $round->students_count, 2)
             : 0;
 
-        $hasCoupon = \Modules\Courses\Models\Coupon::where('is_active', '1')
+        $hasCouponQuery = Coupon::where('is_active', '1')
             ->where('target', 'rounds')
-            ->where('round_id', $roundId)
             ->where(function ($q) {
                 $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', now());
             })
             ->where(function ($q) {
                 $q->where('usage_limit', 0)->orWhereColumn('used_count', '<', 'usage_limit');
-            })
-            ->exists() ? 1 : 0;
+            });
+
+        $hasCouponQuery->where(function ($q) use ($roundId) {
+            if (Schema::hasTable('coupon_round')) {
+                $q->whereHas('rounds', function ($rounds) use ($roundId) {
+                    $rounds->where('rounds.id', $roundId);
+                })->orWhere(function ($global) {
+                    $global->whereNull('round_id')->whereDoesntHave('rounds');
+                });
+            } elseif (Schema::hasColumn('coupons', 'round_id')) {
+                $q->where('round_id', $roundId)->orWhereNull('round_id');
+            }
+        });
+
+        $hasCoupon = $hasCouponQuery->exists() ? 1 : 0;
 
         return res_data([
             'round'          => $round,

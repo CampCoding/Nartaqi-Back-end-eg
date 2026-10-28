@@ -296,12 +296,10 @@ class PaymentController extends Controller
                         // Increment coupon usage if used
                         if ($couponCode && !$isAlreadyPaid) {
                             try {
-                                $couponQuery = \Modules\Courses\Models\Coupon::where('code', $couponCode);
                                 if ($transaction && $transaction->round_id) {
-                                    $couponExists = (clone $couponQuery)->where('target', 'rounds')->where('round_id', $transaction->round_id)->first()
-                                        ?? (clone $couponQuery)->where('target', 'rounds')->whereNull('round_id')->first();
+                                    $couponExists = \Modules\Courses\Models\Coupon::findForRound($couponCode, $transaction->round_id);
                                 } else {
-                                    $couponExists = $couponQuery->where('target', 'store')->first();
+                                    $couponExists = \Modules\Courses\Models\Coupon::where('code', $couponCode)->where('target', 'store')->first();
                                 }
 
                                 if ($couponExists && !\Modules\Courses\Models\Coupon::where('id', $couponExists->id)->where('updated_at', '>=', now()->subMinutes(5))->exists()) {

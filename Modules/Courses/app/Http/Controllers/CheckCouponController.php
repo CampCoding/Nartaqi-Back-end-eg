@@ -31,14 +31,7 @@ class CheckCouponController extends Controller
         $couponQuery = Coupon::where('code', $code);
 
         if ($target === 'rounds') {
-            $coupon = (clone $couponQuery)
-                ->where('target', 'rounds')
-                ->where('round_id', $roundId)
-                ->first() 
-                ?? (clone $couponQuery)
-                ->where('target', 'rounds')
-                ->whereNull('round_id')
-                ->first();
+            $coupon = Coupon::findForRound($code, $roundId);
         } else {
             $coupon = $couponQuery->where('target', 'store')->first();
         }
@@ -67,6 +60,7 @@ class CheckCouponController extends Controller
                             'used_count' => $coupon->used_count,
                             'target' => $coupon->target,
                             'round_id' => $coupon->round_id,
+                            'round_ids' => $coupon->round_ids,
                         ],
                         'request' => [
                             'target' => $target,
@@ -77,7 +71,7 @@ class CheckCouponController extends Controller
                             'expiry_check_failed' => $coupon->expiry_date && $coupon->expiry_date->isPast() ? true : false,
                             'limit_check_failed' => $coupon->usage_limit > 0 && $coupon->used_count >= $coupon->usage_limit,
                             'target_check_failed' => $coupon->target !== $target,
-                            'round_id_check_failed' => ($target === 'rounds' && $coupon->round_id && $coupon->round_id != $roundId) ? true : false,
+                            'round_id_check_failed' => ($target === 'rounds' && !$coupon->appliesToRound($roundId)) ? true : false,
                         ]
                     ]
                 ], 400);
