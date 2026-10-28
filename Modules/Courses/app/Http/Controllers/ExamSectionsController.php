@@ -148,7 +148,7 @@ class ExamSectionsController extends Controller
             // Map sections and include exam_videos/exam_pdfs from outer scope
             $result = $sections->map(function ($section) use ($data, $examinfo) {
                 // Get all questions for this section
-                $questions = AdminQuestionsModel::where('exam_section_id', $section->id)->with(['options', 'paragraph'])->orderBy('id', 'asc')->get();
+                $questions = AdminQuestionsModel::where('exam_section_id', $section->id)->with(['options', 'paragraph'])->orderBy('sort_order')->orderBy('id', 'asc')->get();
 
                 // Map question_id => list of folder names this student saved it in (empty if not saved)
                 $folderNamesByQuestionId = StudentQuestionFolderItemModel::whereIn('question_id', $questions->pluck('id'))
@@ -452,7 +452,7 @@ class ExamSectionsController extends Controller
                 ->keyBy('question_id');
 
             $result = $sections->map(function ($section) use ($data, $examinfo, $mockScratches) {
-                $questions = AdminQuestionsModel::where('exam_section_id', $section->id)->with(['options', 'paragraph'])->orderBy('id', 'asc')->get();
+                $questions = AdminQuestionsModel::where('exam_section_id', $section->id)->with(['options', 'paragraph'])->orderBy('sort_order')->orderBy('id', 'asc')->get();
 
                 // Map question_id => list of folder names this student saved it in (empty if not saved)
                 $folderNamesByQuestionId = StudentQuestionFolderItemModel::whereIn('question_id', $questions->pluck('id'))

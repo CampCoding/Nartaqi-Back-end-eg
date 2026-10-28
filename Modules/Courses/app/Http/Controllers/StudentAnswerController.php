@@ -100,6 +100,8 @@ class StudentAnswerController extends Controller
         // Fetch questions by exam_section_id with their options and paragraph
         $questions = AdminQuestionsModel::whereIn('exam_section_id', $sectionIds)
             ->with(['options', 'paragraph'])
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get();
 
         if ($questions->isEmpty()) {
@@ -263,6 +265,8 @@ class StudentAnswerController extends Controller
         // Fetch questions with options and paragraphs
         $questions = AdminQuestionsModel::whereIn('exam_section_id', $sectionIds)
             ->with(['options', 'paragraph'])
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get();
 
         // Fetch student answers

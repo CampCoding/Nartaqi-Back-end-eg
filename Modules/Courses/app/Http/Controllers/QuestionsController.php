@@ -22,6 +22,8 @@ class QuestionsController extends Controller
 
             $questions = AdminQuestionsModel::where('exam_section_id', $data['exam_section_id'])
                 ->with(['options', 'answer', 'paragraph'])
+                ->orderBy('sort_order')
+                ->orderBy('id')
                 ->get();
 
             $formattedQuestions = [];

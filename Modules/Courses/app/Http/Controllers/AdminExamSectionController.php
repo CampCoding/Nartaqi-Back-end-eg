@@ -30,6 +30,8 @@ class AdminExamSectionController extends Controller
             $formattedSections = $sections->map(function ($section) {
                 $questions = AdminQuestionsModel::where('exam_section_id', $section->id)
                     ->with(['options', 'answer', 'paragraph'])
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
                     ->get();
 
                 $formattedQuestions = [];

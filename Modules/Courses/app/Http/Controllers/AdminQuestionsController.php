@@ -31,6 +31,7 @@ class AdminQuestionsController extends Controller
             // Get all questions with their relationships
             $questions = AdminQuestionsModel::where('exam_section_id', $data['exam_section_id'])
                 ->with(['options', 'paragraph'])
+                ->orderBy('sort_order')
                 ->orderBy('id', 'asc')
                 ->get();
 
@@ -555,7 +556,7 @@ class AdminQuestionsController extends Controller
         $paragraphIds = collect($data['paragraph_ids'] ?? [])->map(fn ($id) => (int) $id)->values();
 
         if ($questionIds->isEmpty() && $paragraphIds->isEmpty()) {
-            return res_data(null, 'اختر سؤالاً أو قطعة واحدة على الأقل', 422);
+            return res_data('اختر سؤالاً أو قطعة واحدة على الأقل', 'خطأ في التحقق من البيانات', 422);
         }
 
         $bankQuestions = QuestionsBankModel::with('options')
@@ -567,7 +568,7 @@ class AdminQuestionsController extends Controller
 
         // A paragraph's questions only make sense with their paragraph, so they're added via paragraph_ids.
         if ($bankQuestions->count() !== $questionIds->count()) {
-            return res_data(null, 'بعض الأسئلة المختارة تابعة لقطعة؛ أضف القطعة كاملة من paragraph_ids', 422);
+            return res_data('بعض الأسئلة المختارة تابعة لقطعة؛ أضف القطعة كاملة من paragraph_ids', 'خطأ في التحقق من البيانات', 422);
         }
 
         $bankParagraphs = QuestionBankParagraphModel::with('questions.options')
@@ -628,6 +629,91 @@ class AdminQuestionsController extends Controller
         }
 
         return $paragraph;
+    }
+
+    /**
+     * Reorder the questions of an exam section. `items` is the list in its new order, using the
+     * same blocks get_questions returns: a standalone question is {type: question, id: question id}
+     * and a paragraph is {type: paragraph, id: paragraph id}, optionally with question_ids to also
+     * reorder the questions inside it. Anything left out keeps its current order after the listed ones.
+     */
+    public function sortQuestions(Request $request)
+    {
+        $data = $request->validate([
+            'exam_section_id' => 'required|exists:exam_sections,id',
+            'items' => 'required|array|min:1',
+            'items.*.type' => 'required|in:question,paragraph',
+            'items.*.id' => 'required|integer',
+            'items.*.question_ids' => 'nullable|array',
+            'items.*.question_ids.*' => 'integer',
+        ]);
+
+        $sectionId = (int) $data['exam_section_id'];
+
+        $questions = AdminQuestionsModel::where('exam_section_id', $sectionId)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'question_type', 'paragraph_id', 'sort_order']);
+
+        // Same grouping as get_questions: all paragraph_mcq questions of one paragraph are one block.
+        $blocks = [];
+        foreach ($questions as $question) {
+            $key = $question->question_type === 'paragraph_mcq'
+                ? 'paragraph:' . $question->paragraph_id
+                : 'question:' . $question->id;
+            $blocks[$key][] = $question;
+        }
+
+        $ordered = [];
+        foreach ($data['items'] as $index => $item) {
+            $key = $item['type'] . ':' . (int) $item['id'];
+            $label = 'العنصر رقم ' . ($index + 1);
+
+            if (!isset($blocks[$key])) {
+                return res_data($label . ' غير موجود في هذا القسم', 'خطأ في التحقق من البيانات', 422);
+            }
+            if (isset($ordered[$key])) {
+                return res_data($label . ' مكرر في الترتيب', 'خطأ في التحقق من البيانات', 422);
+            }
+
+            $block = $blocks[$key];
+
+            if ($item['type'] === 'paragraph' && !empty($item['question_ids'])) {
+                $positions = array_flip(array_map('intval', $item['question_ids']));
+                $blockIds = array_map(fn ($q) => $q->id, $block);
+
+                if (array_diff(array_keys($positions), $blockIds)) {
+                    return res_data($label . ': بعض الأسئلة في question_ids مش تابعة للقطعة دي', 'خطأ في التحقق من البيانات', 422);
+                }
+
+                usort($block, fn ($a, $b) => ($positions[$a->id] ?? PHP_INT_MAX) <=> ($positions[$b->id] ?? PHP_INT_MAX));
+            }
+
+            $ordered[$key] = $block;
+        }
+
+        // Blocks the request didn't mention (e.g. added after the admin opened the page) go last.
+        $ordered += $blocks;
+
+        DB::transaction(function () use ($ordered) {
+            $position = 0;
+            foreach ($ordered as $block) {
+                foreach ($block as $question) {
+                    $position++;
+                    if ((int) $question->sort_order !== $position) {
+                        AdminQuestionsModel::where('id', $question->id)->update(['sort_order' => $position]);
+                    }
+                }
+            }
+        });
+
+        return res_data([
+            'exam_section_id' => $sectionId,
+            'order' => collect(array_keys($ordered))->map(function ($key) {
+                [$type, $id] = explode(':', $key, 2);
+                return ['type' => $type, 'id' => (int) $id];
+            })->values(),
+        ], 'تم ترتيب الأسئلة بنجاح', 200);
     }
 
     public function uploadAudio(Request $request)
