@@ -20,8 +20,14 @@ class AssignExamModel extends Model
         'exam_id',
         'lesson_or_round_id',
         'show_date',
-        'sort_number'
+        'sort_number',
+        'round_exam_section_id'
     ];
+
+    public function round_exam_section()
+    {
+        return $this->belongsTo(RoundExamSectionModel::class, 'round_exam_section_id');
+    }
     public function exam()
     {
         return $this->belongsTo(AdminExamModel::class, 'exam_id');

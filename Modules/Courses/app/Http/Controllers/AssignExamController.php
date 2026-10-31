@@ -12,6 +12,7 @@ use Modules\Courses\Http\Requests\EditExamPdfRequest;
 use Modules\Courses\Http\Requests\EditExamVideoRequest;
 use Modules\Courses\Models\AdminExamModel;
 use Modules\Courses\Models\AssignExamModel;
+use Modules\Courses\Models\RoundExamSectionModel;
 use Modules\Courses\Models\ExamPdfsModel;
 use Modules\Courses\Models\ExamVideoModel;
 use Modules\Courses\Services\ExamCopyService;
@@ -111,14 +112,21 @@ class AssignExamController extends Controller
         $data = $request->validate([
             'type' => 'required|string|max:255',
             'exam_id' => 'required|exists:exams,id',
-            'lesson_or_round_id' => 'required'
+            'lesson_or_round_id' => 'required',
+            'round_exam_section_id' => 'nullable|integer',
         ]);
+
+        $sectionError = RoundExamSectionModel::assignmentError($data['round_exam_section_id'] ?? null, $data['type'], $data['lesson_or_round_id']);
+        if ($sectionError) {
+            return res_data($sectionError, 'خطأ في التحقق من البيانات', 422);
+        }
 
         // Directly assign the existing exam to the round/lesson without copying
         $assign_exam_round = AssignExamModel::create([
             'type' => $data['type'],
             'exam_id' => $data['exam_id'],
-            'lesson_or_round_id' => $data['lesson_or_round_id']
+            'lesson_or_round_id' => $data['lesson_or_round_id'],
+            'round_exam_section_id' => $data['round_exam_section_id'] ?? null,
         ]);
 
         return res_data($assign_exam_round, 'تم تعيين الامتحان بنجاح', 200);
@@ -148,8 +156,14 @@ class AssignExamController extends Controller
             'type' => 'required|string|max:255',
             'exam_id' => 'required|exists:exams,id',
             'lesson_or_round_id' => 'required',
-            'show_date' => 'nullable'
+            'show_date' => 'nullable',
+            'round_exam_section_id' => 'nullable|integer',
         ]);
+
+        $sectionError = RoundExamSectionModel::assignmentError($data['round_exam_section_id'] ?? null, $data['type'], $data['lesson_or_round_id']);
+        if ($sectionError) {
+            return res_data($sectionError, 'خطأ في التحقق من البيانات', 422);
+        }
 
         // Copy the exam (sections, paragraphs, questions, options, answers) and assign the copy,
         // all or nothing, so a failure can't leave a half-copied exam behind.
@@ -167,6 +181,7 @@ class AssignExamController extends Controller
                 'lesson_or_round_id' => $data['lesson_or_round_id'],
                 'show_date' => $data['show_date'] ?? null,
                 'sort_number' => $maxSort ? $maxSort + 1 : 1,
+                'round_exam_section_id' => $data['round_exam_section_id'] ?? null,
             ]);
         });
 

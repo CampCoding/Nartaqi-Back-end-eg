@@ -4,11 +4,12 @@ namespace Modules\Courses\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 // use Modules\Courses\Database\Factories\AdminQuestionsModelFactory;
 
 class AdminQuestionsModel extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     public $table = 'questions';
 
@@ -21,6 +22,7 @@ class AdminQuestionsModel extends Model
         'is_active',
         'paragraph_id',
         'sort_order',
+        'deleted_by',
         'created_at',
         'updated_at',
         'description'

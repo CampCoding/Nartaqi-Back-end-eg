@@ -13,6 +13,7 @@ use Modules\Courses\Models\AssignExamModel;
 use Modules\Courses\Models\StudentScoreModel;
 use Modules\Courses\Models\ExamPdfsModel;
 use Modules\Courses\Models\ExamVideoModel;
+use Modules\Courses\Services\RoundExamSectionsBuilder;
 
 class AdminExamSectionController extends Controller
 {
@@ -209,8 +210,42 @@ class AdminExamSectionController extends Controller
             'round_id' => 'required|exists:rounds,id',
         ]);
 
+        [$sortedExams] = $this->roundExams((int) $data['round_id']);
+
+        return res_data($sortedExams, 'success', 200);
+    }
+
+    /**
+     * Same exams as getAllExamsByRoundId (same exam format), grouped under the round's exam sections.
+     */
+    public function getExamSectionsByRoundId(Request $request)
+    {
+        $data = $request->validate([
+            'round_id' => 'required|exists:rounds,id',
+        ]);
+
+        [$sortedExams, $assignmentMap] = $this->roundExams((int) $data['round_id']);
+
+        $pairs = $sortedExams->map(fn ($exam) => [
+            'assignment' => $assignmentMap[$exam->id],
+            'item' => $exam,
+        ]);
+
+        return res_data(
+            app(RoundExamSectionsBuilder::class)->build((int) $data['round_id'], $pairs),
+            'success',
+            200
+        );
+    }
+
+    /**
+     * The round's whole-round exams with assign_data/videos/pdfs, sorted by sort_number,
+     * plus the assignments keyed by exam_id.
+     */
+    private function roundExams(int $roundId): array
+    {
         $assignments = AssignExamModel::where('type', 'full_round')
-            ->where('lesson_or_round_id', $data['round_id'])
+            ->where('lesson_or_round_id', $roundId)
             ->orderBy('sort_number', 'asc')
             ->get();
 
@@ -232,6 +267,7 @@ class AdminExamSectionController extends Controller
                     'id' => $assignment->id,
                     'show_date' => $assignment->show_date,
                     'sort_number' => $assignment->sort_number,
+                    'round_exam_section_id' => $assignment->round_exam_section_id,
                 ];
             }
 
@@ -246,7 +282,7 @@ class AdminExamSectionController extends Controller
             return $assignmentMap[$exam->id]->sort_number ?? 0;
         })->values();
 
-        return res_data($sortedExams, 'success', 200);
+        return [$sortedExams, $assignmentMap];
     }
 
 

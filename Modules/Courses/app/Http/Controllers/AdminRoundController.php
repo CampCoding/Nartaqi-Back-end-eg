@@ -25,6 +25,7 @@ use Modules\Courses\Models\ExamVideoModel;
 use Modules\Courses\Models\ExamPdfsModel;
 use Modules\Courses\Models\TeachersModel;
 use Modules\Courses\Models\AssignExamModel;
+use Modules\Courses\Models\RoundExamSectionModel;
 use Modules\Courses\Models\UserRounds;
 use Modules\Courses\Models\StudentsRateModel;
 use Modules\Courses\Services\ExamCopyService;
@@ -486,6 +487,15 @@ class AdminRoundController extends Controller
                 ->where('type', 'full_round')
                 ->get();
 
+            // Copy the round's exam sections so the copied exams keep their grouping.
+            $examSectionMap = [];
+            foreach (RoundExamSectionModel::where('round_id', $originalRound->id)->get() as $examSection) {
+                $newExamSection = $examSection->replicate();
+                $newExamSection->round_id = $newRound->id;
+                $newExamSection->save();
+                $examSectionMap[$examSection->id] = $newExamSection->id;
+            }
+
             foreach ($roundExamAssignments as $assignment) {
                 // Copy exam with all its questions, sections, paragraphs
                 $newExam = $copyExamWithQuestions((int) $assignment->exam_id);
@@ -497,6 +507,7 @@ class AdminRoundController extends Controller
                 $newAssignment = $assignment->replicate();
                 $newAssignment->lesson_or_round_id = $newRound->id; // Map to new round
                 $newAssignment->exam_id = $newExam->id; // Map to new exam
+                $newAssignment->round_exam_section_id = $examSectionMap[$assignment->round_exam_section_id] ?? null;
                 $newAssignment->save();
 
                 // Copy Exam Videos where lesson_id is the exam_id

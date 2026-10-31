@@ -9,6 +9,7 @@ use Modules\Courses\Models\AdminExamModel;
 use Modules\Courses\Http\Requests\StoreExamRequest;
 use Modules\Courses\Http\Requests\EditExamRequest;
 use Modules\Courses\Models\AssignExamModel;
+use Modules\Courses\Models\RoundExamSectionModel;
 use Modules\Courses\Models\ExamPdfsModel;
 use Modules\Courses\Models\ExamVideoModel;
 use Modules\Courses\Services\ExamCopyService;
@@ -64,7 +65,13 @@ class AdminExamController extends Controller
             'assign_type' => 'required|in:full_round,lesson',
             'lesson_or_round_id' => 'required',
             'show_date' => 'nullable',
+            'round_exam_section_id' => 'nullable|integer',
         ]);
+
+        $sectionError = RoundExamSectionModel::assignmentError($assignData['round_exam_section_id'] ?? null, $assignData['assign_type'], $assignData['lesson_or_round_id']);
+        if ($sectionError) {
+            return res_data($sectionError, 'خطأ في التحقق من البيانات', 422);
+        }
 
         $data = $request->validated();
         $data['success_percentage'] = $data['success_percentage'] ?? 0;
@@ -77,6 +84,7 @@ class AdminExamController extends Controller
                 'exam_id' => $exam->id,
                 'lesson_or_round_id' => $assignData['lesson_or_round_id'],
                 'show_date' => $assignData['show_date'] ?? null,
+                'round_exam_section_id' => $assignData['round_exam_section_id'] ?? null,
             ]);
 
             return [$exam, $assignment];

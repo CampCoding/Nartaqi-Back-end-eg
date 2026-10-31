@@ -25,6 +25,7 @@ use Modules\Courses\Models\UserRounds;
 use Modules\Courses\Models\TeachersModel;
 use Modules\Favourite\Models\Favourite;
 use Modules\Courses\Models\AssignExamModel;
+use Modules\Courses\Services\RoundExamSectionsBuilder;
 use Modules\Courses\Models\AdminExamModel;
 use Modules\Courses\Models\CourseCategories;
 use Modules\Courses\Models\FreeVideosModel;
@@ -445,6 +446,7 @@ class RoundsController extends Controller
             'round' => $round,
             'contents' => $contentsResponse['contents'] ?? [],
             'exams_round' => $contentsResponse['exams_round'] ?? [],
+            'exams_round_sections' => $contentsResponse['exams_round_sections'] ?? [],
             'own' => $studentOwnsRound,
             'fav' => $studentFavRound,
         ], 'success', 200);
@@ -572,6 +574,20 @@ class RoundsController extends Controller
                     }
                 }
             }
+
+            if (isset($contentsResponse['exams_round_sections'])) {
+                foreach ($contentsResponse['exams_round_sections'] as &$examSection) {
+                    foreach ($examSection['exams'] as &$examRound) {
+                        if (isset($examRound['videos'])) {
+                            foreach ($examRound['videos'] as &$video) {
+                                unset($video['youtube_link']);
+                                unset($video['vimeo_link']);
+                                unset($video['video_url']);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Also hide exam videos if lesson/content was_opened is false (even if student owns the round)
@@ -634,6 +650,7 @@ class RoundsController extends Controller
             'round'          => $round,
             'contents'       => $contentsResponse['contents'] ?? [],
             'exams_round'    => $contentsResponse['exams_round'] ?? [],
+            'exams_round_sections' => $contentsResponse['exams_round_sections'] ?? [],
             'features'       => $features,
             'terms'          => $terms,
             'roundRate'      => $roundRate,
@@ -864,6 +881,7 @@ class RoundsController extends Controller
 
         // ROUND EXAMS (whole round)
         $examsRound = collect();
+        $examRoundPairs = collect();
 
         $assignExamsRound = AssignExamModel::where('lesson_or_round_id', $roundId)
             ->where('type', 'full_round')
@@ -878,7 +896,7 @@ class RoundsController extends Controller
             $examVideos  = ExamVideoModel::whereIn('lesson_id', $examIds)->where('for_type', 'exam')->get()->groupBy('lesson_id');
             $examPdfs    = ExamPdfsModel::whereIn('lesson_id', $examIds)->where('for_type', 'exam')->get()->groupBy('lesson_id');
 
-            $examsRound = $assignExamsRound->map(function ($assign) use ($studentId, $exams, $examVideos, $examPdfs) {
+            $examRoundPairs = $assignExamsRound->map(function ($assign) use ($studentId, $exams, $examVideos, $examPdfs) {
 
                 $exam = $exams->firstWhere('id', $assign->exam_id);
                 if (!$exam) return null;
@@ -887,7 +905,7 @@ class RoundsController extends Controller
                 $allVideos = $examVideos[$assign->exam_id] ?? collect();
                 $allPdfs = $examPdfs[$assign->exam_id] ?? collect();
 
-                return [
+                return ['assignment' => $assign, 'item' => [
                     'exam'       => $exam,
                     'videos'     => $allVideos->values()->toArray(),
                     'exam_pdfs'  => $allPdfs->values()->toArray(),
@@ -897,8 +915,10 @@ class RoundsController extends Controller
                         ->where('student_id', $studentId)
                         ->exists()
                         : false,
-                ];
+                ]];
             })->filter()->values();
+
+            $examsRound = $examRoundPairs->pluck('item');
         }
 
         // BUILD content tree
@@ -972,6 +992,8 @@ class RoundsController extends Controller
         return [
             'contents'    => $contentsArray,
             'exams_round' => $examsRound->values()->toArray(),
+            // Same exams as exams_round, grouped under the round's exam sections (empty sections hidden).
+            'exams_round_sections' => app(RoundExamSectionsBuilder::class)->build($roundId, $examRoundPairs, true),
         ];
     }
 

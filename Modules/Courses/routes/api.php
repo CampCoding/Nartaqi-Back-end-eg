@@ -6,6 +6,7 @@ use App\Http\Middleware\AdminAuthentication;
 use Modules\Courses\Http\Controllers\AdminExamSectionController;
 use Modules\Courses\Http\Controllers\AdminFreeVideosController;
 use Modules\Courses\Http\Controllers\AdminQuestionsController;
+use Modules\Courses\Http\Controllers\AdminRoundExamSectionController;
 use Modules\Courses\Http\Controllers\AssignExamController;
 use Modules\Courses\Http\Controllers\CategoryPartsController;
 use Modules\Courses\Http\Controllers\GeneralAnswersRatingsController;
@@ -234,6 +235,7 @@ Route::middleware(AdminAuthentication::class)->group(function () {
     Route::prefix('admin/exams')->group(function () {
         Route::post('getAllExams', [AdminExamSectionController::class, 'getAllExams']);
         Route::post('getAllExamsByRoundId', [AdminExamSectionController::class, 'getAllExamsByRoundId']);
+        Route::post('getExamSectionsByRoundId', [AdminExamSectionController::class, 'getExamSectionsByRoundId']);
         Route::post('GetStudentScoresByExamId', [AdminExamSectionController::class, 'GetStudentScoresByExamId']);
         Route::post('assign_intern_exam_round', [AssignExamController::class, 'assign_intern_exam_round']);
         Route::post('assign_exam_round', [AssignExamController::class, 'assign_exam_round']);
@@ -267,6 +269,15 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         });
     });
 
+    Route::prefix('admin/round-exam-sections')->group(function () {
+        Route::post('getSectionsByRoundId', [AdminRoundExamSectionController::class, 'getSectionsByRoundId']);
+        Route::post('storeSection', [AdminRoundExamSectionController::class, 'storeSection']);
+        Route::post('editSection', [AdminRoundExamSectionController::class, 'editSection']);
+        Route::post('deleteSection', [AdminRoundExamSectionController::class, 'deleteSection']);
+        Route::post('sortSections', [AdminRoundExamSectionController::class, 'sortSections']);
+        Route::post('moveExamsToSection', [AdminRoundExamSectionController::class, 'moveExamsToSection']);
+    });
+
     Route::prefix('admin/questions')->group(function () {
         Route::post('get_questions', [AdminQuestionsController::class, 'get_questions']);
         Route::post('StoreQuestionWithAnswers', [AdminQuestionsController::class, 'StoreQuestionWithAnswers']);
@@ -280,6 +291,9 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('searchBankQuestions', [AdminQuestionsController::class, 'searchBankQuestions']);
         Route::post('addBankQuestionsToSection', [AdminQuestionsController::class, 'addBankQuestionsToSection']);
         Route::post('sortQuestions', [AdminQuestionsController::class, 'sortQuestions']);
+        Route::post('getDeletedQuestions', [AdminQuestionsController::class, 'getDeletedQuestions']);
+        Route::post('restoreQuestions', [AdminQuestionsController::class, 'restoreQuestions']);
+        Route::post('forceDeleteQuestions', [AdminQuestionsController::class, 'forceDeleteQuestions']);
         Route::post('upload_audio', [AdminQuestionsController::class, 'uploadAudio']);
     });
 });

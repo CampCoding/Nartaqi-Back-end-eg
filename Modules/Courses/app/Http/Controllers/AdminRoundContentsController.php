@@ -12,6 +12,7 @@ use Modules\Courses\Models\LessonsModel;
 use Modules\Courses\Models\VideosModel;
 use Modules\Courses\Models\RoundsLiveModel;
 use Modules\Courses\Models\AssignExamModel;
+use Modules\Courses\Services\RoundExamSectionsBuilder;
 use Modules\Courses\Models\AdminExamModel;
 use Modules\Courses\Models\ExamVideoModel;
 use Modules\Courses\Models\ExamPdfsModel;
@@ -88,6 +89,7 @@ class AdminRoundContentsController extends Controller
         }
 
         $examsRound = collect();
+        $examRoundPairs = collect();
         if ($contentIds->isNotEmpty()) {
             $assignExamsRound = AssignExamModel::where('lesson_or_round_id', $roundId)
                 ->where('type', 'full_round')
@@ -104,7 +106,7 @@ class AdminRoundContentsController extends Controller
                 $examVideosRound = ExamVideoModel::whereIn('lesson_id', $roundLessons)->get()->groupBy('lesson_id');
                 $examPdfsRound = ExamPdfsModel::whereIn('lesson_id', $roundLessons)->get()->groupBy('lesson_id');
 
-                $examsRound = $assignExamsRound->map(function ($assign) use ($examsRoundModels, $examVideosRound, $examPdfsRound, $roundLessons) {
+                $examRoundPairs = $assignExamsRound->map(function ($assign) use ($examsRoundModels, $examVideosRound, $examPdfsRound, $roundLessons) {
                     $exam = $examsRoundModels->firstWhere('id', $assign->exam_id);
                     if (! $exam) {
                         return null;
@@ -117,12 +119,14 @@ class AdminRoundContentsController extends Controller
                         $allPdfs = $allPdfs->merge($examPdfsRound[$lessonId] ?? []);
                     }
 
-                    return [
+                    return ['assignment' => $assign, 'item' => [
                         'exam' => $exam,
                         'videos' => $allVideos->values()->toArray(),
                         'exam_pdfs' => $allPdfs->values()->toArray(),
-                    ];
+                    ]];
                 })->filter()->values();
+
+                $examsRound = $examRoundPairs->pluck('item');
             }
         }
 
@@ -172,6 +176,7 @@ class AdminRoundContentsController extends Controller
         return res_data([
             'contents' => $contentsArray,
             'exams_round' => $examsRound->values()->toArray(),
+            'exams_round_sections' => app(RoundExamSectionsBuilder::class)->build((int) $roundId, $examRoundPairs),
         ], 'success', 200);
     }
 

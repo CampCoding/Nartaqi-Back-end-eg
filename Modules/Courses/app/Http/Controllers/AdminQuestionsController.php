@@ -16,6 +16,13 @@ use Modules\Courses\Models\QuestionParagraphsModel;
 use Modules\Courses\Models\AdminParagraphMcqQuestionsModel;
 use Modules\Courses\Models\QuestionsBankModel;
 use Modules\Courses\Models\QuestionBankParagraphModel;
+use Modules\Admins\Models\Admin;
+use Modules\Courses\Models\AdminExamModel;
+use Modules\Courses\Models\AdminExamSectionModel;
+use Modules\Courses\Models\AssignExamModel;
+use Modules\Courses\Models\LessonsModel;
+use Modules\Courses\Models\RoundContetModel;
+use Modules\Courses\Models\Rounds;
 use Illuminate\Support\Facades\Storage;
 
 class AdminQuestionsController extends Controller
@@ -312,18 +319,14 @@ class AdminQuestionsController extends Controller
 
             $paragraph = QuestionParagraphsModel::find($data['id']);
 
-            // Get all questions associated with this paragraph
+            // Soft delete: the paragraph's questions go to the trash (getDeletedQuestions) and can be
+            // restored, so the paragraph row and the options are kept.
             $questions = AdminQuestionsModel::where('paragraph_id', $paragraph->id)->get();
-
-            foreach ($questions as $question) {
-                // Delete options for each question
-                QuestionOptionsModel::where('question_id', $question->id)->delete();
-                // Delete the question itself
-                $question->delete();
+            if ($questions->isEmpty()) {
+                return res_data('القطعة دي محذوفة بالفعل', 'خطأ في التحقق من البيانات', 422);
             }
 
-            // Finally, delete the paragraph
-            $paragraph->delete();
+            $this->trashQuestions($questions, $request);
 
             return res_data('تم حذف الفقرة والأسئلة المرتبطة بها بنجاح', 'success', 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -344,9 +347,12 @@ class AdminQuestionsController extends Controller
             ]);
 
             $question = AdminQuestionsModel::find($data['id']);
+            if (!$question) {
+                return res_data('السؤال ده محذوف بالفعل', 'خطأ في التحقق من البيانات', 422);
+            }
 
-            QuestionOptionsModel::where('question_id', $question->id)->delete();
-            $question->delete();
+            // Soft delete: the options are kept so the question can be restored as it was.
+            $this->trashQuestions(collect([$question]), $request);
 
             return res_data('تم حذف السؤال بنجاح', 'success', 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -714,6 +720,276 @@ class AdminQuestionsController extends Controller
                 return ['type' => $type, 'id' => (int) $id];
             })->values(),
         ], 'تم ترتيب الأسئلة بنجاح', 200);
+    }
+
+    /**
+     * Trash of deleted exam questions. Same blocks as get_questions (a standalone question, or a
+     * paragraph with its deleted questions), each with where it was deleted from: the exam section, the
+     * exam and the rounds/lessons the exam is assigned to. Filters are optional.
+     */
+    public function getDeletedQuestions(Request $request)
+    {
+        $data = $request->validate([
+            'exam_section_id' => 'nullable|exists:exam_sections,id',
+            'exam_id' => 'nullable|exists:exams,id',
+            'round_id' => 'nullable|exists:rounds,id',
+            'search' => 'nullable|string|max:255',
+            'per_page' => 'nullable|integer|min:1|max:200',
+            'page' => 'nullable|integer|min:1',
+        ]);
+
+        $query = AdminQuestionsModel::onlyTrashed()
+            ->when($data['exam_section_id'] ?? null, fn ($q, $id) => $q->where('exam_section_id', $id))
+            ->when($data['exam_id'] ?? null, fn ($q, $id) => $q->whereIn(
+                'exam_section_id',
+                AdminExamSectionModel::where('exam_id', $id)->select('id')
+            ))
+            ->when($data['round_id'] ?? null, fn ($q, $id) => $q->whereIn(
+                'exam_section_id',
+                AdminExamSectionModel::whereIn('exam_id', $this->roundExamIds((int) $id))->select('id')
+            ))
+            ->when(filled($data['search'] ?? null), function ($q) use ($data) {
+                $like = '%' . addcslashes($data['search'], '\\%_') . '%';
+                $q->where('question_text', 'like', $like);
+            })
+            ->orderBy('deleted_at', 'desc')
+            ->orderBy('id', 'desc');
+
+        // Group into blocks first, then paginate the blocks, so a paragraph is never split across pages.
+        $blocks = [];
+        foreach ($query->get(['id', 'exam_section_id', 'question_type', 'paragraph_id', 'deleted_at']) as $question) {
+            $key = $question->question_type === 'paragraph_mcq' && $question->paragraph_id
+                ? 'paragraph:' . $question->paragraph_id
+                : 'question:' . $question->id;
+            $blocks[$key][] = $question->id;
+        }
+
+        $perPage = (int) ($data['per_page'] ?? 20);
+        $page = (int) ($data['page'] ?? 1);
+        $pageBlocks = array_slice($blocks, ($page - 1) * $perPage, $perPage, true);
+
+        $questions = AdminQuestionsModel::onlyTrashed()
+            ->with(['options', 'paragraph'])
+            ->whereIn('id', collect($pageBlocks)->flatten()->all())
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->keyBy('id');
+
+        $sections = AdminExamSectionModel::whereIn('id', $questions->pluck('exam_section_id')->unique())->get()->keyBy('id');
+        $exams = AdminExamModel::whereIn('id', $sections->pluck('exam_id')->unique())->get(['id', 'title'])->keyBy('id');
+        $usedIn = $this->examLocations($exams->keys()->all());
+        $admins = Admin::whereIn('id', $questions->pluck('deleted_by')->filter()->unique())->get(['id', 'name'])->keyBy('id');
+
+        $formatQuestion = fn ($q) => [
+            'id' => $q->id,
+            'question_text' => $q->question_text,
+            'question_type' => $q->question_type,
+            'instructions' => $q->instructions,
+            'description' => $q->description,
+            'paragraph_id' => $q->paragraph_id,
+            'options' => $q->options,
+            'deleted_at' => $q->deleted_at?->toDateTimeString(),
+        ];
+
+        $items = [];
+        foreach ($pageBlocks as $key => $ids) {
+            [$type, $id] = explode(':', $key, 2);
+            $blockQuestions = collect($ids)->map(fn ($qid) => $questions[$qid] ?? null)->filter()->sortBy('sort_order')->values();
+            if ($blockQuestions->isEmpty()) {
+                continue;
+            }
+
+            $first = $blockQuestions->first();
+            $section = $sections[$first->exam_section_id] ?? null;
+            $exam = $section ? ($exams[$section->exam_id] ?? null) : null;
+            $deletedAt = $blockQuestions->max('deleted_at');
+            $deletedBy = $blockQuestions->sortByDesc('deleted_at')->first()->deleted_by;
+
+            $item = [
+                'type' => $type,
+                'id' => (int) $id,
+                'deleted_at' => $deletedAt?->toDateTimeString(),
+                'deleted_by' => $deletedBy && isset($admins[$deletedBy]) ? ['id' => $admins[$deletedBy]->id, 'name' => $admins[$deletedBy]->name] : null,
+                'deleted_from' => [
+                    'exam_section' => $section ? ['id' => $section->id, 'title' => $section->title] : null,
+                    'exam' => $exam ? ['id' => $exam->id, 'title' => $exam->title] : null,
+                    'used_in' => $exam ? ($usedIn[$exam->id] ?? []) : [],
+                ],
+            ];
+
+            if ($type === 'paragraph') {
+                $paragraph = $first->paragraph;
+                $item['paragraph'] = $paragraph ? [
+                    'id' => $paragraph->id,
+                    'paragraph_content' => $paragraph->paragraph_content,
+                    'voice' => $paragraph->voice,
+                    'description' => $paragraph->description,
+                ] : null;
+                $item['questions'] = $blockQuestions->map($formatQuestion)->all();
+                // How many of this paragraph's questions are still in the exam (0 = the whole paragraph was deleted).
+                $item['active_questions_count'] = AdminQuestionsModel::where('paragraph_id', $id)->count();
+            } else {
+                $item['question'] = $formatQuestion($first);
+            }
+
+            $items[] = $item;
+        }
+
+        return res_data([
+            'data' => $items,
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total' => count($blocks),
+            'last_page' => max(1, (int) ceil(count($blocks) / $perPage)),
+        ], 'success', 200);
+    }
+
+    /**
+     * Put trashed questions back where they were (same exam section, same position).
+     * items: {type: question, id: question id} or {type: paragraph, id: paragraph id} (restores all of
+     * that paragraph's deleted questions), the same ids getDeletedQuestions returns.
+     */
+    public function restoreQuestions(Request $request)
+    {
+        [$questions, $error] = $this->trashedQuestionsFor($request);
+        if ($error) {
+            return res_data($error, 'خطأ في التحقق من البيانات', 422);
+        }
+
+        DB::transaction(function () use ($questions) {
+            AdminQuestionsModel::onlyTrashed()
+                ->whereIn('id', $questions->pluck('id'))
+                ->update(['deleted_at' => null, 'deleted_by' => null]);
+        });
+
+        return res_data([
+            'restored_question_ids' => $questions->pluck('id')->values(),
+            'exam_section_ids' => $questions->pluck('exam_section_id')->unique()->values(),
+        ], 'تم استرجاع الأسئلة بنجاح', 200);
+    }
+
+    /**
+     * Permanently delete trashed questions (with their options and answers). A paragraph left with no
+     * questions at all is removed too. Same items as restoreQuestions.
+     */
+    public function forceDeleteQuestions(Request $request)
+    {
+        [$questions, $error] = $this->trashedQuestionsFor($request);
+        if ($error) {
+            return res_data($error, 'خطأ في التحقق من البيانات', 422);
+        }
+
+        $ids = $questions->pluck('id');
+        $paragraphIds = $questions->pluck('paragraph_id')->filter()->unique();
+
+        DB::transaction(function () use ($ids, $paragraphIds) {
+            QuestionOptionsModel::whereIn('question_id', $ids)->delete();
+            QuestionAnswersModel::whereIn('question_id', $ids)->delete();
+            AdminQuestionsModel::onlyTrashed()->whereIn('id', $ids)->forceDelete();
+
+            $stillUsed = AdminQuestionsModel::withTrashed()->whereIn('paragraph_id', $paragraphIds)->pluck('paragraph_id')->unique();
+            QuestionParagraphsModel::whereIn('id', $paragraphIds->diff($stillUsed))->delete();
+        });
+
+        return res_data(['deleted_question_ids' => $ids->values()], 'تم حذف الأسئلة نهائيًا', 200);
+    }
+
+    private function trashQuestions($questions, Request $request): void
+    {
+        $adminId = optional($request->user())->id;
+
+        DB::transaction(function () use ($questions, $adminId) {
+            AdminQuestionsModel::whereIn('id', $questions->pluck('id'))->update(['deleted_by' => $adminId]);
+            AdminQuestionsModel::whereIn('id', $questions->pluck('id'))->delete();
+        });
+    }
+
+    /**
+     * Resolve restore/forceDelete items to trashed questions. Returns [questions, error message|null].
+     */
+    private function trashedQuestionsFor(Request $request): array
+    {
+        $data = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.type' => 'required|in:question,paragraph',
+            'items.*.id' => 'required|integer',
+        ]);
+
+        $questions = collect();
+        foreach ($data['items'] as $index => $item) {
+            $found = AdminQuestionsModel::onlyTrashed()
+                ->when(
+                    $item['type'] === 'paragraph',
+                    fn ($q) => $q->where('paragraph_id', $item['id']),
+                    fn ($q) => $q->where('id', $item['id'])
+                )
+                ->get();
+
+            if ($found->isEmpty()) {
+                return [null, 'العنصر رقم ' . ($index + 1) . ' مش موجود في المحذوفات'];
+            }
+
+            $questions = $questions->merge($found);
+        }
+
+        return [$questions->unique('id')->values(), null];
+    }
+
+    /**
+     * Exam ids used by a round: its whole-round exams plus the exams of its lessons.
+     */
+    private function roundExamIds(int $roundId): array
+    {
+        $lessonIds = LessonsModel::whereIn('round_content_id', RoundContetModel::where('round_id', $roundId)->select('id'))->pluck('id');
+
+        return AssignExamModel::where(function ($q) use ($roundId, $lessonIds) {
+            $q->where(fn ($w) => $w->where('type', 'full_round')->where('lesson_or_round_id', $roundId))
+                ->orWhere(fn ($w) => $w->where('type', 'lesson')->whereIn('lesson_or_round_id', $lessonIds));
+        })->pluck('exam_id')->unique()->values()->all();
+    }
+
+    /**
+     * exam_id => where the exam is assigned: [{type: full_round, round}, {type: lesson, lesson, round}].
+     * An exam with no assignment (e.g. a bank exam) gets an empty list.
+     */
+    private function examLocations(array $examIds): array
+    {
+        if (empty($examIds)) {
+            return [];
+        }
+
+        $assignments = AssignExamModel::whereIn('exam_id', $examIds)->get();
+        $lessons = LessonsModel::with('round_content:id,round_id,title')
+            ->whereIn('id', $assignments->where('type', 'lesson')->pluck('lesson_or_round_id'))
+            ->get(['id', 'title', 'round_content_id'])
+            ->keyBy('id');
+        $roundIds = $assignments->where('type', 'full_round')->pluck('lesson_or_round_id')
+            ->merge($lessons->pluck('round_content.round_id'))
+            ->filter()->unique();
+        $rounds = Rounds::whereIn('id', $roundIds)->get(['id', 'name'])->keyBy('id');
+
+        $result = [];
+        foreach ($assignments as $assignment) {
+            if ($assignment->type === 'lesson') {
+                $lesson = $lessons[$assignment->lesson_or_round_id] ?? null;
+                $round = $lesson && $lesson->round_content ? ($rounds[$lesson->round_content->round_id] ?? null) : null;
+                $result[$assignment->exam_id][] = [
+                    'type' => 'lesson',
+                    'lesson' => $lesson ? ['id' => $lesson->id, 'title' => $lesson->title] : null,
+                    'round' => $round ? ['id' => $round->id, 'name' => $round->name] : null,
+                ];
+            } else {
+                $round = $rounds[$assignment->lesson_or_round_id] ?? null;
+                $result[$assignment->exam_id][] = [
+                    'type' => 'full_round',
+                    'lesson' => null,
+                    'round' => $round ? ['id' => $round->id, 'name' => $round->name] : null,
+                ];
+            }
+        }
+
+        return $result;
     }
 
     public function uploadAudio(Request $request)
