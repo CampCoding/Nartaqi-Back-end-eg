@@ -34,4 +34,26 @@ class PlacementTestSuggestionModel extends Model
     {
         return $this->belongsTo(Rounds::class, 'suggestion_round_id');
     }
+
+    /**
+     * The suggestion (with its round) whose score range contains $score, or null.
+     */
+    public static function forScore(int $placementTestId, ?string $score): ?self
+    {
+        $degree = PlacementTestStudentScoresModel::degreeOf($score);
+
+        $suggestion = static::where('placement_test_id', $placementTestId)
+            ->where('from_score', '<=', $degree)
+            ->where('to_score', '>=', $degree)
+            ->with(['suggestionRound' => function ($query) {
+                $query->select('id', 'name', 'image');
+            }])
+            ->first();
+
+        if ($suggestion && $suggestion->suggestionRound) {
+            $suggestion->suggestionRound->setVisible(['id', 'name', 'image_url'])->setAppends(['image_url']);
+        }
+
+        return $suggestion;
+    }
 }

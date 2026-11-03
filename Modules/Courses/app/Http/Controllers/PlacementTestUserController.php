@@ -4,8 +4,11 @@ namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Modules\Courses\Models\CategoryPartsModel;
+use Modules\Courses\Models\PlacementTestAnswerModel;
 use Modules\Courses\Models\PlacementTestModel;
+use Modules\Courses\Models\PlacementTestQuestionsModel;
 use Modules\Courses\Models\PlacementTestSectionsModel;
 use Modules\Courses\Models\PlacementTestStudentScoresModel;
 use Modules\Courses\Models\PlacementTestSuggestionModel;
@@ -124,30 +127,61 @@ class PlacementTestUserController extends Controller
             'student_id' => 'required|exists:students,id',
             'placement_test_id' => 'required|exists:placement_test,id',
             'score' => 'required|string',
+            'answers' => 'nullable|array',
+            'answers.*.question_id' => 'required|integer|distinct',
+            'answers.*.option_id' => 'nullable|integer',
+            'answers.*.answer_text' => 'nullable|string',
         ]);
 
-        $scoreRecord = PlacementTestStudentScoresModel::create($data);
+        $answers = collect($data['answers'] ?? []);
 
-        // Parse score (e.g., "10/20")
-        $parts = explode('/', $data['score']);
-        $studentDegree = isset($parts[0]) ? (int) $parts[0] : 0;
+        // Answers must be questions of this placement test, with options of those same questions.
+        $questions = $answers->isEmpty() ? collect() : PlacementTestQuestionsModel::whereIn('id', $answers->pluck('question_id'))
+            ->whereIn('placement_test_section_id', PlacementTestSectionsModel::where('placement_test_id', $data['placement_test_id'])->select('id'))
+            ->with('options:id,question_id,is_correct')
+            ->get()
+            ->keyBy('id');
 
-        // Find suggestion based on placement_test_id and degree range
-        $suggestion = PlacementTestSuggestionModel::where('placement_test_id', $data['placement_test_id'])
-            ->where('from_score', '<=', $studentDegree)
-            ->where('to_score', '>=', $studentDegree)
-            ->with(['suggestionRound' => function ($query) {
-                $query->select('id', 'name', 'image');
-            }])
-            ->first();
-
-        if ($suggestion && $suggestion->suggestionRound) {
-            $suggestion->suggestionRound->setVisible(['id', 'name', 'image_url'])->setAppends(['image_url']);
+        foreach ($answers->values() as $index => $answer) {
+            $question = $questions[$answer['question_id']] ?? null;
+            if (!$question) {
+                return res_data('السؤال رقم ' . ($index + 1) . ' في الإجابات مش تبع اختبار تحديد المستوى ده', 'خطأ في التحقق من البيانات', 422);
+            }
+            if (!empty($answer['option_id']) && !$question->options->contains('id', (int) $answer['option_id'])) {
+                return res_data('الاختيار في الإجابة رقم ' . ($index + 1) . ' مش تبع السؤال بتاعها', 'خطأ في التحقق من البيانات', 422);
+            }
         }
+
+        // Every attempt is kept as its own row; the latest one is the student's current result.
+        $scoreRecord = DB::transaction(function () use ($data, $answers, $questions) {
+            $scoreRecord = PlacementTestStudentScoresModel::create(collect($data)->only(['student_id', 'placement_test_id', 'score'])->all());
+
+            foreach ($answers as $answer) {
+                $optionId = !empty($answer['option_id']) ? (int) $answer['option_id'] : null;
+                $option = $optionId ? $questions[$answer['question_id']]->options->firstWhere('id', $optionId) : null;
+
+                PlacementTestAnswerModel::create([
+                    'score_id' => $scoreRecord->id,
+                    'question_id' => (int) $answer['question_id'],
+                    'option_id' => $optionId,
+                    'answer_text' => $answer['answer_text'] ?? null,
+                    'is_correct' => $option ? (bool) $option->is_correct : null,
+                ]);
+            }
+
+            return $scoreRecord;
+        });
+
+        $attemptsCount = PlacementTestStudentScoresModel::where('student_id', $data['student_id'])
+            ->where('placement_test_id', $data['placement_test_id'])
+            ->count();
 
         return res_data([
             'score' => $scoreRecord,
-            'suggestion' => $suggestion
+            'suggestion' => PlacementTestSuggestionModel::forScore((int) $data['placement_test_id'], $data['score']),
+            'attempt_number' => $attemptsCount,
+            'attempts_count' => $attemptsCount,
+            'answers_count' => $answers->count(),
         ], 'Score saved and suggestion retrieved', 200);
     }
 
@@ -158,36 +192,19 @@ class PlacementTestUserController extends Controller
             'placement_test_id' => 'required|exists:placement_test,id',
         ]);
 
-        $scoreRecord = PlacementTestStudentScoresModel::where('student_id', $data['student_id'])
-            ->where('placement_test_id', $data['placement_test_id'])
-            ->first();
+        $attempts = PlacementTestStudentScoresModel::where('student_id', $data['student_id'])
+            ->where('placement_test_id', $data['placement_test_id']);
 
-        $isSolved = $scoreRecord ? true : false;
-        $suggestion = null;
-
-        if ($isSolved) {
-            // Parse score (e.g., "10/20")
-            $parts = explode('/', $scoreRecord->score);
-            $studentDegree = isset($parts[0]) ? (int) $parts[0] : 0;
-
-            // Find suggestion based on placement_test_id and degree range
-            $suggestion = PlacementTestSuggestionModel::where('placement_test_id', $data['placement_test_id'])
-                ->where('from_score', '<=', $studentDegree)
-                ->where('to_score', '>=', $studentDegree)
-                ->with(['suggestionRound' => function ($query) {
-                    $query->select('id', 'name', 'image');
-                }])
-                ->first();
-
-            if ($suggestion && $suggestion->suggestionRound) {
-                $suggestion->suggestionRound->setVisible(['id', 'name', 'image_url'])->setAppends(['image_url']);
-            }
-        }
+        // The latest attempt is the student's current result (the student may retake the test).
+        $scoreRecord = (clone $attempts)->orderByDesc('id')->first();
 
         return res_data([
-            'is_solved' => $isSolved,
+            'is_solved' => (bool) $scoreRecord,
             'score' => $scoreRecord,
-            'suggestion' => $suggestion
+            'suggestion' => $scoreRecord
+                ? PlacementTestSuggestionModel::forScore((int) $data['placement_test_id'], $scoreRecord->score)
+                : null,
+            'attempts_count' => $attempts->count(),
         ], 'Checked successfully', 200);
     }
 }

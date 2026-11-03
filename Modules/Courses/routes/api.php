@@ -5,6 +5,7 @@ use App\Http\Middleware\Authentication;
 use App\Http\Middleware\AdminAuthentication;
 use Modules\Courses\Http\Controllers\AdminExamSectionController;
 use Modules\Courses\Http\Controllers\AdminFreeVideosController;
+use Modules\Courses\Http\Controllers\AdminPlacementTestScoresController;
 use Modules\Courses\Http\Controllers\AdminQuestionsController;
 use Modules\Courses\Http\Controllers\AdminRoundExamSectionController;
 use Modules\Courses\Http\Controllers\AssignExamController;
@@ -580,6 +581,9 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('storePlacementTest', [PlacementTestController::class, 'storePlacementTest']);
         Route::post('editPlacementTest', [PlacementTestController::class, 'editPlacementTest']);
         Route::post('deletePlacementTest', [PlacementTestController::class, 'deletePlacementTest']);
+        Route::post('getPlacementTestStudents', [AdminPlacementTestScoresController::class, 'getPlacementTestStudents']);
+        Route::post('getStudentPlacementTestAttempts', [AdminPlacementTestScoresController::class, 'getStudentPlacementTestAttempts']);
+        Route::post('getPlacementTestAttemptAnswers', [AdminPlacementTestScoresController::class, 'getPlacementTestAttemptAnswers']);
     });
 
     Route::prefix('admin/placement-test-sections')->group(function () {
