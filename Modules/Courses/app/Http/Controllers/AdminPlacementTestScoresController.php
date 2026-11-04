@@ -43,7 +43,7 @@ class AdminPlacementTestScoresController extends Controller
             ->when($data['student_id'] ?? null, fn ($q, $id) => $q->where('student_id', $id))
             ->when($like, fn ($q) => $q->whereIn(
                 'student_id',
-                Student::where(fn ($w) => $w->where('name', 'like', $like)->orWhere('phone', 'like', $like)->orWhere('email', 'like', $like))->select('id')
+                Student::where(fn ($w) => $w->where('name', 'like', $like)->orWhere('phone', 'like', $like))->select('id')
             ))
             ->groupBy('student_id', 'placement_test_id')
             ->orderByDesc('last_attempt_id')
@@ -51,7 +51,7 @@ class AdminPlacementTestScoresController extends Controller
 
         $items = collect($rows->items());
         $lastAttempts = PlacementTestStudentScoresModel::whereIn('id', $items->pluck('last_attempt_id'))->get()->keyBy('id');
-        $students = Student::whereIn('id', $items->pluck('student_id')->unique())->get(['id', 'name', 'phone', 'email', 'gender'])->keyBy('id');
+        $students = Student::whereIn('id', $items->pluck('student_id')->unique())->get(['id', 'name', 'phone', 'gender'])->keyBy('id');
         $tests = PlacementTestModel::whereIn('id', $items->pluck('placement_test_id')->unique())->get(['id', 'title', 'category_part_id'])->keyBy('id');
         $suggestions = $this->suggestionsByTest($items->pluck('placement_test_id')->unique()->all());
 
@@ -61,7 +61,7 @@ class AdminPlacementTestScoresController extends Controller
             $test = $tests[$row->placement_test_id] ?? null;
 
             return [
-                'student' => $student ? $student->only(['id', 'name', 'phone', 'email', 'gender']) : ['id' => (int) $row->student_id],
+                'student' => $student ? $student->only(['id', 'name', 'phone', 'gender']) : ['id' => (int) $row->student_id],
                 'placement_test' => $test ? $test->only(['id', 'title', 'category_part_id']) : ['id' => (int) $row->placement_test_id],
                 'attempts_count' => (int) $row->attempts_count,
                 'last_score' => $last?->score,
@@ -121,7 +121,7 @@ class AdminPlacementTestScoresController extends Controller
         })->sortByDesc(fn ($test) => $test['attempts'][0]['id'])->values();
 
         return res_data([
-            'student' => Student::find($data['student_id'], ['id', 'name', 'phone', 'email', 'gender'])->only(['id', 'name', 'phone', 'email', 'gender']),
+            'student' => Student::find($data['student_id'], ['id', 'name', 'phone', 'gender'])->only(['id', 'name', 'phone', 'gender']),
             'placement_tests' => $result,
         ], 'success', 200);
     }
@@ -209,7 +209,7 @@ class AdminPlacementTestScoresController extends Controller
 
         $questionsCount = PlacementTestQuestionsModel::whereIn('placement_test_section_id', $sections->pluck('id'))->count();
         $test = PlacementTestModel::find($attempt->placement_test_id, ['id', 'title', 'category_part_id']);
-        $student = Student::find($attempt->student_id, ['id', 'name', 'phone', 'email', 'gender']);
+        $student = Student::find($attempt->student_id, ['id', 'name', 'phone', 'gender']);
 
         return res_data([
             'attempt' => [
@@ -218,7 +218,7 @@ class AdminPlacementTestScoresController extends Controller
                 'score' => $attempt->score,
                 'created_at' => $attempt->created_at?->toDateTimeString(),
             ],
-            'student' => $student?->only(['id', 'name', 'phone', 'email', 'gender']),
+            'student' => $student?->only(['id', 'name', 'phone', 'gender']),
             'placement_test' => $test?->only(['id', 'title', 'category_part_id']),
             'summary' => [
                 'questions_count' => $questionsCount,
