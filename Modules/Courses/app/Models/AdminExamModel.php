@@ -27,7 +27,8 @@ class AdminExamModel extends Model
         'type',
         'success_percentage',
         'exam_label_id',
-        'from_copy'
+        'from_copy',
+        'copied_from_id'
     ];
 
 
@@ -39,6 +40,29 @@ class AdminExamModel extends Model
     public function exam_sections()
     {
         return $this->hasMany(AdminExamSectionModel::class, 'exam_id');
+    }
+
+    /**
+     * Whether exams.copied_from_id exists yet (the migration may run after the code is uploaded).
+     */
+    public static function tracksCopySource(): bool
+    {
+        static $has = null;
+
+        return $has ??= \Illuminate\Support\Facades\Schema::hasColumn('exams', 'copied_from_id');
+    }
+
+    /**
+     * Ids of exams that are this bank exam itself or copies made from it.
+     */
+    public static function familyIds(int $bankExamId): array
+    {
+        $ids = [$bankExamId];
+        if (static::tracksCopySource()) {
+            $ids = array_merge($ids, static::where('copied_from_id', $bankExamId)->pluck('id')->all());
+        }
+
+        return $ids;
     }
 
     public function questions()

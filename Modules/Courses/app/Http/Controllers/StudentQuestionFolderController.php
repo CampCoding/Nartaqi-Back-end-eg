@@ -207,13 +207,14 @@ class StudentQuestionFolderController extends Controller
     }
 
     /**
-     * Generate a random exam from a folder's questions.
+     * Generate a random exam from a folder's questions. question_count: "all"/missing = every question
+     * in the folder; a whole number = that many picked at random (capped at what the folder has).
      */
     public function generateExam(Request $request)
     {
         $data = $request->validate([
             'folder_id' => 'required|integer',
-            'question_count' => 'required',
+            'question_count' => 'nullable',
             'mode' => 'required|in:default,tiger',
             'title' => 'nullable|string|max:255',
         ]);
@@ -228,8 +229,12 @@ class StudentQuestionFolderController extends Controller
             return res_data('الفولدر غير موجود', 'error', 404);
         }
 
-        $availableQuestionIds = StudentQuestionFolderItemModel::where('folder_id', $folder->id)
-            ->pluck('question_id');
+        // Only questions that still exist (a question deleted from its exam would count here but
+        // never show up in the folder exam), each once.
+        $availableQuestionIds = AdminQuestionsModel::whereIn(
+            'id',
+            StudentQuestionFolderItemModel::where('folder_id', $folder->id)->select('question_id')
+        )->pluck('id')->unique()->values();
 
         $availableCount = $availableQuestionIds->count();
 
@@ -237,21 +242,18 @@ class StudentQuestionFolderController extends Controller
             return res_data('الفولدر لا يحتوي على أسئلة', 'error', 422);
         }
 
-        if ($data['question_count'] === 'all') {
+        $count = $data['question_count'] ?? null;
+        if ($count === null || $count === '' || (is_string($count) && strtolower(trim($count)) === 'all')) {
             $requestedCount = $availableCount;
         } else {
-            if (!is_numeric($data['question_count']) || (int) $data['question_count'] < 1) {
+            $requestedCount = filter_var(is_string($count) ? trim($count) : $count, FILTER_VALIDATE_INT);
+            if ($requestedCount === false || $requestedCount < 1) {
                 return res_data('عدد الأسئلة غير صحيح', 'error', 422);
             }
-            $requestedCount = (int) $data['question_count'];
         }
 
-        if ($requestedCount > $availableCount) {
-            return res_data([
-                'requested' => $requestedCount,
-                'available' => $availableCount,
-            ], 'عدد الأسئلة المطلوب أكبر من عدد الأسئلة المتاحة في الفولدر', 400);
-        }
+        // Asking for more than the folder has just uses every question.
+        $requestedCount = min($requestedCount, $availableCount);
 
         $selectedQuestionIds = $availableQuestionIds->shuffle()->take($requestedCount)->values();
 
@@ -276,7 +278,12 @@ class StudentQuestionFolderController extends Controller
             return $folderExam;
         });
 
-        return res_data($folderExam, 'success', 201);
+        // Same fields as before, plus folder_exam_id for the frontend.
+        return res_data(
+            ['folder_exam_id' => $folderExam->id] + $folderExam->toArray() + ['available_count' => $availableCount],
+            'success',
+            201
+        );
     }
 
     /**
@@ -527,7 +534,7 @@ class StudentQuestionFolderController extends Controller
             'question_text' => $question->question_text,
             'question_type' => $question->question_type,
             'instructions' => $question->instructions,
-            'description' => $question->question_type === 'paragraph_mcq' ? null : $question->description,
+            'description' => $question->description,
             'paragraph_id' => $question->paragraph_id,
             'options' => $question->options,
             'selected_option_id' => $answer->selected_option_id ?? null,

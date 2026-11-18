@@ -883,10 +883,14 @@ class RoundsController extends Controller
         $examsRound = collect();
         $examRoundPairs = collect();
 
-        $assignExamsRound = AssignExamModel::where('lesson_or_round_id', $roundId)
-            ->where('type', 'full_round')
-            ->orderBy('sort_number', 'asc')
-            ->get();
+        // An exam assigned to the round more than once is shown once.
+        $assignExamsRound = AssignExamModel::uniqueByExam(
+            AssignExamModel::where('lesson_or_round_id', $roundId)
+                ->where('type', 'full_round')
+                ->orderBy('sort_number', 'asc')
+                ->orderBy('id', 'asc')
+                ->get()
+        );
 
         if ($assignExamsRound->isNotEmpty()) {
 

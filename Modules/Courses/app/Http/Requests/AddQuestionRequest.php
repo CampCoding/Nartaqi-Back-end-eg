@@ -30,6 +30,7 @@ class AddQuestionRequest extends FormRequest
             $rules['questions'] = 'required|array|min:1';
             $rules['questions.*.question_text'] = 'required|string';
             $rules['questions.*.instructions'] = 'nullable';
+            $rules['questions.*.description'] = 'nullable';
             $rules['questions.*.mcq_array'] = 'required|array|min:1';
             $rules['questions.*.mcq_array.*.answer'] = 'required|string';
             $rules['questions.*.mcq_array.*.question_explanation'] = 'nullable|string';

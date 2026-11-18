@@ -34,9 +34,12 @@ class RoundCompletionService
             ->get()
             ->groupBy('lesson_or_round_id');
 
-        $roundAssignments = AssignExamModel::where('type', 'full_round')
-            ->where('lesson_or_round_id', $roundId)
-            ->get();
+        // An exam assigned to the round twice must not count twice in the completion rate.
+        $roundAssignments = AssignExamModel::uniqueByExam(
+            AssignExamModel::where('type', 'full_round')
+                ->where('lesson_or_round_id', $roundId)
+                ->get()
+        );
 
         $exams = ExamModel::whereIn(
             'id',
@@ -148,6 +151,38 @@ class RoundCompletionService
             'total_percentage' => empty($categoryAverages)
                 ? 0
                 : round(array_sum($categoryAverages) / count($categoryAverages), 2),
+        ];
+    }
+
+    /**
+     * The student's completion report for a round, in the exact shape getMyCompeletenessRoundByRoundID
+     * returns (also used by the admin to look at one student). $slots can be passed in to avoid
+     * rebuilding them for every student of the same round.
+     */
+    public function studentReport($roundId, int $studentId, ?array $slots = null): array
+    {
+        $slots ??= $this->examSlots((int) $roundId);
+        $best = $this->bestScores([$studentId], array_column($slots, 'exam_id'));
+        $completion = $this->breakdown($slots, $best[$studentId] ?? []);
+
+        $basicContents = $completion['items']['basic'];
+        $lectureContents = $completion['items']['lecture'];
+        $fullRoundContents = $completion['items']['full_round'];
+        $completed = fn ($items) => count(array_filter($items, fn ($i) => $i['highest_score'] !== "0%" && $i['highest_score'] !== 0));
+
+        return [
+            'round_id' => $roundId,
+            'basic' => $basicContents,
+            'lecture' => $lectureContents,
+            'full_round' => $fullRoundContents,
+            'basic_percentage' => $completion['basic_percentage'] . '%',
+            'lecture_percentage' => $completion['lecture_percentage'] . '%',
+            'full_round_percentage' => $completion['full_round_percentage'] . '%',
+            'total_percentage' => $completion['total_percentage'] . '%',
+            'total_completed_basic' => $completed($basicContents),
+            'total_completed_lecture' => $completed($lectureContents),
+            'total_completed_full_round' => $completed($fullRoundContents),
+            'total_contents' => count($basicContents) + count($lectureContents) + count($fullRoundContents),
         ];
     }
 

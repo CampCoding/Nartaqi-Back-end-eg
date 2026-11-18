@@ -57,6 +57,7 @@ class AdminExamSectionController extends Controller
                                 'exam_section_id' => $paragraphModel->exam_section_id,
                                 'paragraph_content' => $paragraphModel->paragraph_content,
                                 'voice' => $paragraphModel->voice,
+                                'description' => $paragraphModel->description,
                                 'created_at' => $paragraphModel->created_at,
                                 'updated_at' => $paragraphModel->updated_at,
                             ] : null,
@@ -71,6 +72,7 @@ class AdminExamSectionController extends Controller
                                     'options' => $q->options,
                                     'answer' => $q->answer,
                                     'paragraph' => $q->paragraph,
+                                    'description' => $q->description,
                                 ];
                             })->values()->toArray(),
                         ];
@@ -85,6 +87,7 @@ class AdminExamSectionController extends Controller
                             'options' => $question->options,
                             'answer' => $question->answer,
                             'paragraph' => null,
+                            'description' => $question->description,
                         ];
                     }
                 }
@@ -244,10 +247,14 @@ class AdminExamSectionController extends Controller
      */
     private function roundExams(int $roundId): array
     {
-        $assignments = AssignExamModel::where('type', 'full_round')
-            ->where('lesson_or_round_id', $roundId)
-            ->orderBy('sort_number', 'asc')
-            ->get();
+        // An exam assigned to the round more than once is shown once (same row everywhere).
+        $assignments = AssignExamModel::uniqueByExam(
+            AssignExamModel::where('type', 'full_round')
+                ->where('lesson_or_round_id', $roundId)
+                ->orderBy('sort_number', 'asc')
+                ->orderBy('id', 'asc')
+                ->get()
+        );
 
         $assignedAsRoundExamIds = $assignments->pluck('exam_id')->unique()->toArray();
 

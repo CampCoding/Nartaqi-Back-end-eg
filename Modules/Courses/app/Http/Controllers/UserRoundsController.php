@@ -155,30 +155,7 @@ class UserRoundsController extends Controller
                 return res_data(null, 'You are not enrolled in this round', 404);
             }
 
-            $slots = $this->completion->examSlots((int) $roundId);
-            $best = $this->completion->bestScores([$student->id], array_column($slots, 'exam_id'));
-            $completion = $this->completion->breakdown($slots, $best[$student->id] ?? []);
-
-            $basicContents = $completion['items']['basic'];
-            $lectureContents = $completion['items']['lecture'];
-            $fullRoundContents = $completion['items']['full_round'];
-
-            $response = [
-                'round_id' => $roundId,
-                'basic' => $basicContents,
-                'lecture' => $lectureContents,
-                'full_round' => $fullRoundContents,
-                'basic_percentage' => $completion['basic_percentage'] . '%',
-                'lecture_percentage' => $completion['lecture_percentage'] . '%',
-                'full_round_percentage' => $completion['full_round_percentage'] . '%',
-                'total_percentage' => $completion['total_percentage'] . '%',
-                'total_completed_basic' => count(array_filter($basicContents, fn($i) => $i['highest_score'] !== "0%" && $i['highest_score'] !== 0)),
-                'total_completed_lecture' => count(array_filter($lectureContents, fn($i) => $i['highest_score'] !== "0%" && $i['highest_score'] !== 0)),
-                'total_completed_full_round' => count(array_filter($fullRoundContents, fn($i) => $i['highest_score'] !== "0%" && $i['highest_score'] !== 0)),
-                'total_contents' => count($basicContents) + count($lectureContents) + count($fullRoundContents),
-            ];
-
-            return res_data($response, 'success', 200);
+            return res_data($this->completion->studentReport($roundId, $student->id), 'success', 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation Exception', ['errors' => $e->errors()]);
             return res_data($e->errors(), 'Validation failed', 422);

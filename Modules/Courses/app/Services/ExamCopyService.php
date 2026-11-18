@@ -29,6 +29,10 @@ class ExamCopyService
 
         $newExam = $originalExam->replicate();
         $newExam->from_copy = '1';
+        // Always point at the bank exam it all started from, also when copying a copy.
+        if (AdminExamModel::tracksCopySource()) {
+            $newExam->copied_from_id = $originalExam->copied_from_id ?: $originalExam->id;
+        }
         $newExam->created_at = now();
         $newExam->updated_at = now();
         $newExam->save();

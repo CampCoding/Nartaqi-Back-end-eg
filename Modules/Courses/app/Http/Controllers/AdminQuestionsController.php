@@ -75,6 +75,7 @@ class AdminQuestionsController extends Controller
                                 'instructions' => $q->instructions,
                                 'paragraph_id' => $q->paragraph_id,
                                 'options' => $q->options,
+                                'description' => $q->description,
                             ];
                         })->values()->toArray(),
                     ];
@@ -149,6 +150,7 @@ class AdminQuestionsController extends Controller
                             'question_type' => 'paragraph_mcq',
                             'instructions' => $questionData['instructions'],
                             'paragraph_id' => $paragraph_mcq->id,
+                            'description' => $questionData['description'] ?? null,
                         ]);
 
                         // Create MCQ options for each question
@@ -256,11 +258,15 @@ class AdminQuestionsController extends Controller
 
             $question = AdminQuestionsModel::find($data['id']);
 
-            $question->update([
+            $changes = [
                 'question_text' => $data['question_text'],
                 'instructions' => $data['instructions'] ?? null,
-                'description' => $data['description'] ?? null,
-            ]);
+            ];
+            // An edit that doesn't send the description keeps the saved one (sending it empty clears it).
+            if ($request->exists('description')) {
+                $changes['description'] = $data['description'] ?? null;
+            }
+            $question->update($changes);
 
             QuestionOptionsModel::where('question_id', $question->id)->delete();
 
@@ -295,11 +301,11 @@ class AdminQuestionsController extends Controller
 
             $quesParagra =  QuestionParagraphsModel::find($data['id']);
 
-            $quesParagra->update([
-                'paragraph_content' => $data['paragraph_content'],
-                'voice' => $data['voice'] ?? null,
-                'description' => $data['description'] ?? null,
-            ]);
+            // Only fields that were sent change, so editing the text alone doesn't wipe the voice/description.
+            $quesParagra->update(collect(['paragraph_content', 'voice', 'description'])
+                ->filter(fn ($field) => $request->exists($field))
+                ->mapWithKeys(fn ($field) => [$field => $data[$field] ?? null])
+                ->all());
 
             return res_data($quesParagra, 'تم تعديل الفقرة بنجاح', 200);
         } catch (\Illuminate\Validation\ValidationException $e) {

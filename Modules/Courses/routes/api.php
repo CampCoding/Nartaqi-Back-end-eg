@@ -6,7 +6,9 @@ use App\Http\Middleware\AdminAuthentication;
 use Modules\Courses\Http\Controllers\AdminExamSectionController;
 use Modules\Courses\Http\Controllers\AdminFreeVideosController;
 use Modules\Courses\Http\Controllers\AdminPlacementTestScoresController;
+use Modules\Courses\Http\Controllers\AdminQrCodesController;
 use Modules\Courses\Http\Controllers\AdminQuestionsController;
+use Modules\Courses\Http\Controllers\AdminRoundCompletionController;
 use Modules\Courses\Http\Controllers\AdminRoundExamSectionController;
 use Modules\Courses\Http\Controllers\AssignExamController;
 use Modules\Courses\Http\Controllers\CategoryPartsController;
@@ -240,6 +242,9 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('GetStudentScoresByExamId', [AdminExamSectionController::class, 'GetStudentScoresByExamId']);
         Route::post('assign_intern_exam_round', [AssignExamController::class, 'assign_intern_exam_round']);
         Route::post('assign_exam_round', [AssignExamController::class, 'assign_exam_round']);
+        Route::post('getLessonLinkedBankExams', [AssignExamController::class, 'getLessonLinkedBankExams']);
+        Route::post('restoreExamsToBank', [AssignExamController::class, 'restoreExamsToBank']);
+        Route::post('removeDuplicateExamAssignments', [AssignExamController::class, 'removeDuplicateExamAssignments']);
         Route::post('editAssignShowDate', [AssignExamController::class, 'editAssignShowDate']);
         Route::post('sortExamRound', [AdminExamSectionController::class, 'sortExamRound']);
 
@@ -354,6 +359,8 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('getRoundFreeVideos', [AdminRoundController::class, 'getRoundFreeVideos']);
 
         Route::post('getAllStudentInRound', [AdminRoundController::class, 'getAllStudentInRound']);
+        Route::post('getRoundStudentsCompletion', [AdminRoundCompletionController::class, 'getRoundStudentsCompletion']);
+        Route::post('getStudentCompletion', [AdminRoundCompletionController::class, 'getStudentCompletion']);
         Route::post('getStudentRateRound', [AdminRoundController::class, 'getStudentRateRound']);
         Route::post('showHiddenStudentRate', [AdminRoundController::class, 'showHiddenStudentRate']);
 
@@ -574,6 +581,18 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('updateCourseRequirements', [CourseRequirementsController::class, 'updateCourseRequirements']);
         Route::post('deleteCourseRequirements', [CourseRequirementsController::class, 'deleteCourseRequirements']);
     });
+    Route::prefix('admin/qr-codes')->group(function () {
+        Route::post('createBatch', [AdminQrCodesController::class, 'createBatch']);
+        Route::post('getBooks', [AdminQrCodesController::class, 'getBooks']);
+        Route::post('updateBook', [AdminQrCodesController::class, 'updateBook']);
+        Route::post('updateSection', [AdminQrCodesController::class, 'updateSection']);
+        Route::post('getCodes', [AdminQrCodesController::class, 'getCodes']);
+        Route::post('getCode', [AdminQrCodesController::class, 'getCode']);
+        Route::post('updateCode', [AdminQrCodesController::class, 'updateCode']);
+        Route::post('setActive', [AdminQrCodesController::class, 'setActive']);
+        Route::post('exportSection', [AdminQrCodesController::class, 'exportSection']);
+    });
+
     Route::prefix('admin/placement-tests')->group(function () {
         Route::get('getCategoryPartsSortedForPlacementTest', [PlacementTestController::class, 'getCategoryPartsSortedForPlacementTest']);
         Route::post('makeSort', [PlacementTestController::class, 'makeSort']);

@@ -91,9 +91,12 @@ class AdminRoundContentsController extends Controller
         $examsRound = collect();
         $examRoundPairs = collect();
         if ($contentIds->isNotEmpty()) {
-            $assignExamsRound = AssignExamModel::where('lesson_or_round_id', $roundId)
-                ->where('type', 'full_round')
-                ->get();
+            // An exam assigned to the round more than once is shown once.
+            $assignExamsRound = AssignExamModel::uniqueByExam(
+                AssignExamModel::where('lesson_or_round_id', $roundId)
+                    ->where('type', 'full_round')
+                    ->get()
+            );
 
             if ($assignExamsRound->isNotEmpty()) {
                 $examIdsRound = $assignExamsRound->pluck('exam_id')->unique();

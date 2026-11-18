@@ -48,6 +48,7 @@ class QuestionsController extends Controller
                             'exam_section_id' => $paragraphModel->exam_section_id,
                             'paragraph_content' => $paragraphModel->paragraph_content,
                             'voice' => $paragraphModel->voice,
+                            'description' => $paragraphModel->description,
                         ] : null,
                         'questions' => $paragraphQuestions->map(function ($q) {
                             return [
@@ -60,6 +61,7 @@ class QuestionsController extends Controller
                                 'options' => $q->options,
                                 'answer' => $q->answer,
                                 'paragraph' => $q->paragraph,
+                                'description' => $q->description,
                             ];
                         })->values()->toArray(),
                     ];
@@ -74,6 +76,7 @@ class QuestionsController extends Controller
                         'options' => $question->options,
                         'answer' => $question->answer,
                         'paragraph' => null,
+                        'description' => $question->description,
                     ];
                 }
             }

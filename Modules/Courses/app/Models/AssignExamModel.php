@@ -41,4 +41,31 @@ class AssignExamModel extends Model
     {
         return $this->belongsTo(LessonsModel::class, 'lesson_or_round_id');
     }
+
+    /**
+     * One assignment per exam. The same exam can end up assigned twice to the same round/lesson
+     * (e.g. a double click on "add"); every listing shows it once, using the row returned by
+     * keeperFor(). The original order of the collection is kept.
+     */
+    public static function uniqueByExam($assignments)
+    {
+        $keepIds = $assignments->groupBy('exam_id')
+            ->map(fn ($group) => static::keeperFor($group)->id)
+            ->flip();
+
+        return $assignments->filter(fn ($a) => isset($keepIds[$a->id]))->values();
+    }
+
+    /**
+     * Which of several assignments of the same exam to keep: the one the admin set a show_date on
+     * (explicit data), otherwise the last one by (sort_number, id), which is the one the admin's
+     * getAllExamsByRoundId has always shown.
+     */
+    public static function keeperFor($group)
+    {
+        $ordered = $group->sortBy([['sort_number', 'asc'], ['id', 'asc']])->values();
+        $withShowDate = $ordered->filter(fn ($a) => filled($a->show_date));
+
+        return ($withShowDate->isNotEmpty() ? $withShowDate : $ordered)->last();
+    }
 }
