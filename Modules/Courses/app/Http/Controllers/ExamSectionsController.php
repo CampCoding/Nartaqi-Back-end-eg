@@ -304,6 +304,8 @@ class ExamSectionsController extends Controller
                 'exam_info' => $examinfo,
                 'round_id' => $examinfo->round_id ?? null,
                 'is_solved' => $check_solved_exam,
+                // How many times the student finished this exam (every finished attempt stores a score).
+                'attempts_count' => $allScores->count(),
                 'last_score' => $lastScore,
                 'correct_answers' => $correctAnswers,
                 'total_questions' => $totalQuestions,
