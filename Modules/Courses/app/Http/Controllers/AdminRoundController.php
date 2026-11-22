@@ -27,6 +27,8 @@ use Modules\Courses\Models\TeachersModel;
 use Modules\Courses\Models\AssignExamModel;
 use Modules\Courses\Models\RoundExamSectionModel;
 use Modules\Courses\Models\UserRounds;
+use Modules\Courses\Models\PaymentTransaction;
+use Modules\Courses\Models\Coupon;
 use Modules\Courses\Models\StudentsRateModel;
 use Modules\Courses\Services\ExamCopyService;
 use Modules\Courses\Services\RoundCompletionService;
@@ -303,8 +305,29 @@ class AdminRoundController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // The coupon a student used is saved on the online payment (pay_load.coupon_code). A subscription
+        // points at its payment through payment_id (= the invoice id); otherwise the student's last paid
+        // payment for this round is used. Manual (bank transfer / admin) subscriptions have no coupon.
+        // (cart payments are saved with round_id = null, so the invoice match is not filtered by round)
+        $transactions = PaymentTransaction::whereIn('invoice_id', $subscriptions->pluck('payment_id')->filter()->unique()->values())
+            ->orWhere(fn ($w) => $w->where('round_id', $data['round_id'])
+                ->whereIn('student_id', $subscriptions->pluck('student_id')->unique()->values())
+                ->where('status', 'paid'))
+            ->orderBy('id')
+            ->get();
+        $byInvoice = $transactions->keyBy('invoice_id');
+        $lastPaidByStudent = $transactions->where('status', 'paid')->keyBy('student_id');
+        $coupons = Coupon::whereIn('code', $transactions->map(fn ($t) => strtoupper((string) ($t->pay_load['coupon_code'] ?? '')))->filter()->unique())
+            ->get(['id', 'code', 'type', 'value'])
+            ->keyBy(fn ($c) => strtoupper($c->code));
+
         // Transform the data to put student info first with subscription details nested
-        $formattedData = $subscriptions->map(function ($subscription) {
+        $formattedData = $subscriptions->map(function ($subscription) use ($byInvoice, $lastPaidByStudent, $coupons) {
+            $transaction = ($subscription->payment_id ? $byInvoice->get($subscription->payment_id) : null)
+                ?? $lastPaidByStudent->get($subscription->student_id);
+            $couponCode = $transaction ? strtoupper((string) ($transaction->pay_load['coupon_code'] ?? '')) : '';
+            $coupon = $couponCode !== '' ? $coupons->get($couponCode) : null;
+
             $studentData = $subscription->student ? $subscription->student->toArray() : null;
 
             // Remove unwanted fields from student data
@@ -325,6 +348,8 @@ class AdminRoundController extends Controller
                         'status' => $subscription->status,
                         'created_at' => $subscription->created_at,
                         'updated_at' => $subscription->updated_at,
+                        'coupon_code' => $couponCode !== '' ? $couponCode : null,
+                        'coupon' => $coupon ? $coupon->only(['id', 'code', 'type', 'value']) : null,
                     ]
                 ]
             );

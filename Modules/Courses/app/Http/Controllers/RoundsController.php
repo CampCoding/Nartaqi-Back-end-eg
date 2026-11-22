@@ -847,8 +847,10 @@ class RoundsController extends Controller
             $exams           = AdminExamModel::whereIn('id', $examIds)->get();
             $examVideos      = ExamVideoModel::whereIn('lesson_id', $lessonIds)->where('for_type', 'lesson')->get()->groupBy('lesson_id');
             $examPdfs        = ExamPdfsModel::whereIn('lesson_id', $lessonIds)->where('for_type', 'lesson')->get()->groupBy('lesson_id');
+            // Finished attempts of this student per exam (one row in student_scores per submission).
+            $attemptsByExam  = $this->studentAttemptsByExam($studentId, $examIds);
 
-            $examsByLesson = $lessonIds->mapWithKeys(function ($lessonId) use ($assignExamsLesson, $exams, $examVideos, $examPdfs, $studentId) {
+            $examsByLesson = $lessonIds->mapWithKeys(function ($lessonId) use ($assignExamsLesson, $exams, $examVideos, $examPdfs, $attemptsByExam) {
                 $assign = $assignExamsLesson->firstWhere('lesson_or_round_id', $lessonId);
 
                 // Ensure proper type matching for exam_id
@@ -863,15 +865,13 @@ class RoundsController extends Controller
                 $examPdfsArray = ($examPdfs[$lessonId] ?? collect())->values()->toArray();
 
                 if ($exam || !empty($videos) || !empty($examPdfsArray)) {
+                    $attempts = $exam ? (int) ($attemptsByExam[$exam->id] ?? 0) : 0;
                     return [$lessonId => [
-                        'exam'       => $exam,
-                        'videos'     => $videos,
-                        'exam_pdfs'  => $examPdfsArray,
-                        'is_solved'  => $exam && $studentId
-                            ? StudentScoreModel::where('exam_id', $exam->id)
-                            ->where('student_id', $studentId)
-                            ->exists()
-                            : false,
+                        'exam'           => $exam,
+                        'videos'         => $videos,
+                        'exam_pdfs'      => $examPdfsArray,
+                        'is_solved'      => $attempts > 0,
+                        'attempts_count' => $attempts,
                     ]];
                 }
 
@@ -899,8 +899,9 @@ class RoundsController extends Controller
             // 'lesson', 'exam'
             $examVideos  = ExamVideoModel::whereIn('lesson_id', $examIds)->where('for_type', 'exam')->get()->groupBy('lesson_id');
             $examPdfs    = ExamPdfsModel::whereIn('lesson_id', $examIds)->where('for_type', 'exam')->get()->groupBy('lesson_id');
+            $attemptsByExam = $this->studentAttemptsByExam($studentId, $examIds);
 
-            $examRoundPairs = $assignExamsRound->map(function ($assign) use ($studentId, $exams, $examVideos, $examPdfs) {
+            $examRoundPairs = $assignExamsRound->map(function ($assign) use ($exams, $examVideos, $examPdfs, $attemptsByExam) {
 
                 $exam = $exams->firstWhere('id', $assign->exam_id);
                 if (!$exam) return null;
@@ -909,16 +910,15 @@ class RoundsController extends Controller
                 $allVideos = $examVideos[$assign->exam_id] ?? collect();
                 $allPdfs = $examPdfs[$assign->exam_id] ?? collect();
 
+                $attempts = (int) ($attemptsByExam[$exam->id] ?? 0);
+
                 return ['assignment' => $assign, 'item' => [
-                    'exam'       => $exam,
-                    'videos'     => $allVideos->values()->toArray(),
-                    'exam_pdfs'  => $allPdfs->values()->toArray(),
-                    'show_date'  => $assign->show_date,
-                    'is_solved'  => $studentId
-                        ? StudentScoreModel::where('exam_id', $exam->id)
-                        ->where('student_id', $studentId)
-                        ->exists()
-                        : false,
+                    'exam'           => $exam,
+                    'videos'         => $allVideos->values()->toArray(),
+                    'exam_pdfs'      => $allPdfs->values()->toArray(),
+                    'show_date'      => $assign->show_date,
+                    'is_solved'      => $attempts > 0,
+                    'attempts_count' => $attempts,
                 ]];
             })->filter()->values();
 
@@ -999,6 +999,24 @@ class RoundsController extends Controller
             // Same exams as exams_round, grouped under the round's exam sections (empty sections hidden).
             'exams_round_sections' => app(RoundExamSectionsBuilder::class)->build($roundId, $examRoundPairs, true),
         ];
+    }
+
+    /**
+     * How many times the student finished each exam: [exam_id => count]. Empty for guests.
+     */
+    private function studentAttemptsByExam(?int $studentId, $examIds): array
+    {
+        $examIds = collect($examIds)->filter()->unique()->values();
+        if (!$studentId || $examIds->isEmpty()) {
+            return [];
+        }
+
+        return StudentScoreModel::where('student_id', $studentId)
+            ->whereIn('exam_id', $examIds)
+            ->selectRaw('exam_id, COUNT(*) as attempts')
+            ->groupBy('exam_id')
+            ->pluck('attempts', 'exam_id')
+            ->all();
     }
 
     private function attachTeachersToRounds(Collection $rounds): Collection

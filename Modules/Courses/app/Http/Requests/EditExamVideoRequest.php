@@ -17,7 +17,9 @@ class EditExamVideoRequest extends FormRequest
             'id' => 'required',
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'video_url' => 'required|string'
+            'video_url' => 'required|string',
+            // Optional: only changes the lock when sent.
+            'is_locked' => 'nullable|boolean'
         ];
     }
     public function messages(): array

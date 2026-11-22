@@ -32,15 +32,43 @@ class AssignExamController extends Controller
     public function add_exam_video(AddExamVideoRequest $request)
     {
         $data = $request->validated();
+        // Not sent (or empty) = locked, the column default.
+        if (!isset($data['is_locked'])) {
+            unset($data['is_locked']);
+        }
         $exam_video = ExamVideoModel::create($data);
-        return res_data($exam_video, 'success', 200);
+        return res_data($exam_video->fresh(), 'success', 200);
     }
     public function edit_exam_video(EditExamVideoRequest $request)
     {
         $data = $request->validated();
+        // The lock only changes when it is sent.
+        if (!isset($data['is_locked'])) {
+            unset($data['is_locked']);
+        }
         $exam_video = ExamVideoModel::find($data['id']);
         $exam_video->update($data);
         return res_data($exam_video, 'success', 200);
+    }
+
+    /**
+     * Lock or open a training/exam video for students. ids lets the admin change several at once.
+     */
+    public function setExamVideoLock(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|distinct|exists:exam_videos,id',
+            'is_locked' => 'required|boolean',
+        ]);
+
+        ExamVideoModel::whereIn('id', $data['ids'])->update(['is_locked' => (bool) $data['is_locked']]);
+
+        return res_data(
+            ExamVideoModel::whereIn('id', $data['ids'])->get(),
+            $data['is_locked'] ? 'تم قفل الفيديو' : 'تم فتح الفيديو',
+            200
+        );
     }
     public function delete_exam_video(Request $request)
     {

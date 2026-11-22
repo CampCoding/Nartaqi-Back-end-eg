@@ -18,9 +18,14 @@ class ExamVideoModel extends Model
         'title',
         'description',
         'video_url',
-        'for_type'
+        'for_type',
+        'is_locked'
     ];
     protected $table = 'exam_videos';
+
+    protected $casts = [
+        'is_locked' => 'boolean',
+    ];
     public function lesson()
     {
         return $this->belongsTo(LessonsModel::class, 'lesson_id');

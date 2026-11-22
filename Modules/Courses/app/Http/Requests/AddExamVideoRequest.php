@@ -18,7 +18,9 @@ class AddExamVideoRequest extends FormRequest
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'video_url' => 'required|string',
-            'for_type' => 'required|string'
+            'for_type' => 'required|string',
+            // Optional: a new video is locked unless the admin sends is_locked = 0.
+            'is_locked' => 'nullable|boolean'
 
         ];
     }

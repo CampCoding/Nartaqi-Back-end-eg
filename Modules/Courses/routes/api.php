@@ -259,6 +259,7 @@ Route::middleware(AdminAuthentication::class)->group(function () {
         Route::post('add_exam_video', [AssignExamController::class, 'add_exam_video']);
         Route::post('edit_exam_video', [AssignExamController::class, 'edit_exam_video']);
         Route::post('delete_exam_video', [AssignExamController::class, 'delete_exam_video']);
+        Route::post('setExamVideoLock', [AssignExamController::class, 'setExamVideoLock']);
         Route::post('add_exam_pdf', [AssignExamController::class, 'add_exam_pdf']);
         Route::post('edit_exam_pdf', [AssignExamController::class, 'edit_exam_pdf']);
         Route::post('delete_exam_pdf', [AssignExamController::class, 'delete_exam_pdf']);

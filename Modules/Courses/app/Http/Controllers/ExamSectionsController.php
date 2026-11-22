@@ -619,6 +619,8 @@ class ExamSectionsController extends Controller
                 'previous_exam_id' => $previousExamId,
                 'next_exam_id' => $nextExamId,
                 'is_solved' => $check_solved_exam,
+                // How many times the student finished (submitted) this mock exam.
+                'attempts_count' => $allScores->count(),
                 'last_score' => $lastScore,
                 'correct_answers' => $correctAnswers,
                 'total_questions' => $totalQuestions,
