@@ -5,22 +5,49 @@ namespace Modules\Blogs\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
+use Modules\Blogs\Models\Blog;
 
 class BlogRequest extends FormRequest
 {
     /**
      * Get the validation rules that apply to the request.
      */
+    /** The blog being edited (update_blog sends id), null when adding. */
+    private function blogId(): ?int
+    {
+        $id = $this->input('id');
+        return is_scalar($id) && ctype_digit((string) $id) ? (int) $id : null;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        // "خطة مذاكرة القدرات" -> "خطة-مذاكرة-القدرات", so the unique check sees the final slug.
+        if (is_string($this->input('slug')) && filled($this->input('slug'))) {
+            $this->merge(['slug' => Blog::normalizeSlug($this->input('slug'), 120) ?: null]);
+        }
+    }
+
     public function rules(): array
     {
+        $id = $this->blogId();
+
         return [
-            'title' => 'required|string',
+            'title' => 'required|string|max:255',
+            'slug' => ['nullable', 'string', 'max:120', Rule::unique('blogs', 'slug')->ignore($id)],
             'content' => 'required|string',
-            'image' => 'nullable',
+            'meta_title' => 'nullable|string|max:70',
+            'meta_description' => 'nullable|string|max:300',
+            // Adding: the cover is required. Editing: only checked when a new file is sent
+            // (the panel may send the current image link back as text).
+            'image' => $id
+                ? ($this->hasFile('image') ? ['image', 'max:5120'] : ['nullable'])
+                : ['required', 'image', 'max:5120'],
+            'image_alt' => 'nullable|string|max:255',
             'published_at' => 'nullable|date',
             'related_blogs_ids' => 'nullable',
-            'hidden' => 'boolean|default:1',
-            'views' => 'integer|default:0',
+            'hidden' => 'sometimes|boolean',
+            'views' => 'sometimes|integer|min:0',
         ];
     }
 
@@ -29,10 +56,20 @@ class BlogRequest extends FormRequest
     {
         return [
             'title.required' => 'العنوان مطلوب.',
+            'title.max' => 'العنوان يجب ألا يزيد عن 255 حرفًا.',
+            'slug.unique' => 'رابط المقال مستخدم في مقال آخر.',
+            'slug.max' => 'رابط المقال يجب ألا يزيد عن 120 حرفًا.',
             'content.required' => 'المحتوى مطلوب.',
+            'meta_title.max' => 'عنوان جوجل يجب ألا يزيد عن 70 حرفًا.',
+            'meta_description.max' => 'وصف جوجل يجب ألا يزيد عن 300 حرف.',
+            'image.required' => 'صورة الغلاف مطلوبة.',
+            'image.image' => 'صورة الغلاف يجب أن تكون صورة.',
+            'image.max' => 'حجم صورة الغلاف يجب ألا يزيد عن 5 ميجا.',
+            'image_alt.max' => 'وصف الصورة يجب ألا يزيد عن 255 حرفًا.',
             'published_at.date' => 'يجب أن يكون تاريخًا صالحًا.',
             'hidden.boolean' => 'يجب أن يكون الحقل مخفيًا أو ظاهرًا.',
-
+            'views.integer' => 'عدد المشاهدات يجب أن يكون رقمًا.',
+            'views.min' => 'عدد المشاهدات لا يمكن أن يكون سالبًا.',
         ];
     }
 

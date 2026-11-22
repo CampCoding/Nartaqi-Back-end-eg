@@ -106,6 +106,12 @@ class AdminBlogsController extends Controller
         if (!$blog) {
             return res_data('هذا المقال غير موجود', 'failed', 404);
         }
+
+        // An empty slug keeps the current link (changing it would break links already indexed by Google).
+        if (blank($data['slug'] ?? null)) {
+            unset($data['slug']);
+        }
+
         if (request()->hasFile('image')) {
             $destinationPath = public_path('storage/' . 'blogs');
             if (! file_exists($destinationPath)) {

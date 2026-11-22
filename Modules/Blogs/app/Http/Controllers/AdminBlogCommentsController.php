@@ -63,7 +63,7 @@ class AdminBlogCommentsController extends Controller
             return res_data('يجب ارسال معرف المقال','failed',400);
         }
 
-        $comments = BlogComment::where('blog_id',$blog_id)->get();
+        $comments = BlogComment::with('student:id,name,image')->where('blog_id',$blog_id)->get();
         return res_data($comments,'success',200);
 
     }

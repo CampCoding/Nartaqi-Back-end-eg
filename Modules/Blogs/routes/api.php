@@ -14,7 +14,9 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
 Route::prefix('user/blogs')->group(function () {
     Route::get('/', [BlogsController::class, 'getBlogs']);
+    Route::get('/sitemap', [BlogsController::class, 'sitemap']);
     Route::post('/get_blog', [BlogsController::class, 'getBlog']);
+    Route::post('/view', [BlogsController::class, 'addView']);
 
     Route::post('/comments', [BlogCommentsController::class, 'getBlogComments']);
 

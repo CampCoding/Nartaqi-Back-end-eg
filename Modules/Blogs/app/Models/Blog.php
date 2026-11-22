@@ -15,9 +15,13 @@ class Blog extends Model
      */
     protected $fillable = [
         'title',
+        'slug',
         'content',
+        'meta_title',
+        'meta_description',
         'image',
         'image_cover',
+        'image_alt',
         'published_at',
         'hidden',
         'related_blogs_ids',
@@ -28,6 +32,63 @@ class Blog extends Model
         'related_blogs_ids' => 'array',
     ];
 
+    /** Light columns for blog cards (related blogs). */
+    public const CARD_COLUMNS = ['id', 'slug', 'title', 'image', 'image_cover', 'image_alt', 'published_at', 'created_at'];
+
+    protected static function booted(): void
+    {
+        // A blog saved without a slug gets one from its title. An existing slug is never changed here,
+        // so editing the title keeps the blog's link.
+        static::saving(function (Blog $blog) {
+            if (blank($blog->slug)) {
+                $blog->slug = static::uniqueSlug((string) $blog->title, $blog->id);
+            }
+        });
+    }
+
+    /**
+     * Readable link text: Arabic and Latin letters and digits joined by "-".
+     * Str::slug drops Arabic letters, so it is built by hand. Diacritics and tatweel are removed.
+     * A slug that is only a number gets a "blog-" prefix so it is never mistaken for an id.
+     */
+    public static function normalizeSlug(?string $text, int $maxLength = 80): string
+    {
+        $text = mb_strtolower(trim((string) $text));
+        $text = (string) preg_replace('/[\p{Mn}\x{0640}]+/u', '', $text);
+        $text = (string) preg_replace('/[^\p{L}\p{N}]+/u', '-', $text);
+        $text = trim(mb_substr(trim($text, '-'), 0, $maxLength), '-');
+
+        if ($text !== '' && is_numeric($text)) {
+            $text = 'blog-' . $text;
+        }
+
+        return $text;
+    }
+
+    /** A slug for the title that no other blog uses ("-2", "-3"... added on repeats). */
+    public static function uniqueSlug(string $title, ?int $ignoreId = null): string
+    {
+        $base = static::normalizeSlug($title) ?: 'blog';
+        $slug = $base;
+        $i = 2;
+
+        while (static::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
+            $slug = "{$base}-{$i}";
+            $i++;
+        }
+
+        return $slug;
+    }
+
+    /** Visible and already published (no publish date, or a date that has passed). */
+    public function scopePublished($query)
+    {
+        return $query->where($query->qualifyColumn('hidden'), 0)
+            ->where(fn ($q) => $q->whereNull($q->qualifyColumn('published_at'))
+                ->orWhere($q->qualifyColumn('published_at'), '<=', now()));
+    }
+
+    /** Related blogs in the order the admin chose, published only, card fields only (no content). */
     public function relatedBlogs()
     {
         $ids = $this->related_blogs_ids ?: [];
@@ -35,9 +96,21 @@ class Blog extends Model
             $ids = array_filter(explode(',', $ids));
         }
 
-        $ids = array_map('intval', (array)$ids);
+        $ids = array_values(array_diff(
+            array_unique(array_filter(array_map('intval', (array) $ids))),
+            [(int) $this->id]
+        ));
 
-        return Blog::whereIn('id', $ids)->where('hidden', 0)->get();
+        if (!$ids) {
+            return collect();
+        }
+
+        return Blog::published()
+            ->whereIn('id', $ids)
+            ->select(self::CARD_COLUMNS)
+            ->get()
+            ->sortBy(fn ($blog) => array_search((int) $blog->id, $ids, true))
+            ->values();
     }
 
 
