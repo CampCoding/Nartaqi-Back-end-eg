@@ -6,6 +6,8 @@ use Modules\Authentication\Http\Controllers\AuthenticationController;
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+// Upload limits that apply on this server (the frontend checks a file's size before uploading it).
+Route::get('/upload-limits', fn () => res_data(\App\Support\Uploads::limits(), 'success', 200));
 // Route::module('Admins');
 // Signup route moved to routes/web.php to expose /authentication/signup without /api prefix
 

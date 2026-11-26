@@ -3,6 +3,7 @@
 namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -39,7 +40,7 @@ class CategoryPartFreeController extends Controller
         // Handle image upload
         if ($request->hasFile('image')) {
             $image = $request->file('image');
-            $imagePath = $image->store('category_parts_for_free', 'public');
+            $imagePath = $image->store('category_parts_for_free', 'public') ?: Uploads::storageFailed($image, 'category_parts_for_free');
             $data['image'] = $imagePath;
         }
 
@@ -98,7 +99,7 @@ class CategoryPartFreeController extends Controller
             }
 
             $image = $request->file('image');
-            $imagePath = $image->store('category_parts_for_free', 'public');
+            $imagePath = $image->store('category_parts_for_free', 'public') ?: Uploads::storageFailed($image, 'category_parts_for_free');
             $data['image'] = $imagePath;
         }
 

@@ -3,6 +3,7 @@
 namespace Modules\Store\Services;
 
 use Illuminate\Support\Facades\Storage;
+use App\Support\Uploads;
 
 class UploadService
 {
@@ -31,7 +32,7 @@ class UploadService
      */
     private static function save($file, string $path)
     {
-        $savedPath = $file->store($path, 'public');
+        $savedPath = $file->store($path, 'public') ?: Uploads::storageFailed($file, $path);
         $url = rtrim(config('app.url'), '/') . '/storage/app/public/' . $savedPath;
         return str_replace('camp-coding.site', 'nartaqi.net', $url);
     }

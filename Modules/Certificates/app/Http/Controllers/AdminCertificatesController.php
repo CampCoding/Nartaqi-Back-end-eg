@@ -127,7 +127,7 @@ class AdminCertificatesController extends Controller
             if ($path) {
                 return res_data(['pdf_path' => asset('storage/' . $path)], 'تم رفع الملف بنجاح', 200);
             } else {
-                return res_data('حدث خطأ أثناء رفع الملف.', 'failed', 500);
+                Uploads::storageFailed($file, 'certificates/pdf');
             }
         } else {
             return res_data('لم يتم رفع أي ملف.', 'failed', 400);

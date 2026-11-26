@@ -3,6 +3,7 @@
 namespace Modules\Marketers\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Support\Uploads;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
 use Modules\Marketers\Models\Marketer;
@@ -66,7 +67,7 @@ class MarketersController extends Controller
 
         $marketer['password'] = bcrypt($request['password']);
         if( $request->hasFile('cv') ) {
-            $path = $request->file('cv')->store('marketers_cvs', 'public');
+            $path = $request->file('cv')->store('marketers_cvs', 'public') ?: Uploads::storageFailed($request->file('cv'), 'marketers_cvs');
             $url = rtrim(config('app.url'), '/') . '/storage/app/public/' . $path;
             $marketer['cv'] = str_replace('camp-coding.site', 'nartaqi.net', $url);
 

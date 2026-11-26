@@ -3,6 +3,7 @@
 namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -1012,7 +1013,7 @@ class AdminQuestionsController extends Controller
                 $fileName = time() . '_' . preg_replace('/\s+/', '_', $file->getClientOriginalName());
 
                 // Store the file in a specific directory for audio
-                $path = $file->storeAs('uploads/audio', $fileName, 'public');
+                $path = $file->storeAs('uploads/audio', $fileName, 'public') ?: Uploads::storageFailed($file, 'uploads/audio');
 
                 // Generate the public URL
                 $url = asset('storage/' . $path);
@@ -1026,6 +1027,9 @@ class AdminQuestionsController extends Controller
 
             return res_data(null, 'لم يتم العثور على ملف مرفق', 400);
         } catch (\Exception $e) {
+            if (Uploads::isUploadProblem($e)) {
+                throw Uploads::failureFrom($e, $request->file('file'));
+            }
             Log::error('uploadAudio Error: ' . $e->getMessage());
             return res_data($e->getMessage(), 'حدث خطأ أثناء رفع ملف الصوت', 500);
         }

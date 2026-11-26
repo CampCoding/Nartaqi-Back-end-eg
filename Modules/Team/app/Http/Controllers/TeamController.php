@@ -3,6 +3,7 @@
 namespace Modules\Team\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Support\Uploads;
 use Modules\Team\Models\Team;
 use App\Http\Controllers\Controller;
 use Modules\Team\Http\Requests\TeamRequest;
@@ -72,7 +73,7 @@ class TeamController extends Controller
     {
         $data = $request->validated();
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('team', 'public');
+            $path = $request->file('image')->store('team', 'public') ?: Uploads::storageFailed($request->file('image'), 'team');
             $data['image'] = $path;
         }
         $team = Team::create($data);
@@ -92,7 +93,7 @@ class TeamController extends Controller
             return res_data('هذا العضو غير موجود', 'failed', 404);
         }
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('team', 'public');
+            $path = $request->file('image')->store('team', 'public') ?: Uploads::storageFailed($request->file('image'), 'team');
             $data['image'] = $path;
         }
         $team->update($data);

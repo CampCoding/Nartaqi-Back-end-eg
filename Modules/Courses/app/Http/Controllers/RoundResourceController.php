@@ -3,6 +3,7 @@
 namespace Modules\Courses\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Support\Uploads;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
 use Modules\Courses\Models\RoundResouceModel;
@@ -79,7 +80,7 @@ class RoundResourceController extends Controller
                 $fileUrl = asset('storage/' . $path);
                 $updateData['url'] = $fileUrl;
             } else {
-                return res_data('حدث خطأ أثناء رفع الملف', 'failed', 500);
+                Uploads::storageFailed($file, 'round_resources/pdf');
             }
         }
 
@@ -115,7 +116,7 @@ class RoundResourceController extends Controller
 
             return res_data('تم إضافة الملف بنجاح', 'success', 200);
         } else {
-            return res_data('حدث خطأ أثناء رفع الملف', 'failed', 500);
+            Uploads::storageFailed($file, 'round_resources/pdf');
         }
     }
     public function deleteRoundResource(DeleteRoundResources $request)

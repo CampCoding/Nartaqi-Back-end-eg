@@ -92,6 +92,9 @@ class CoursesController extends Controller
 
             return res_data(null, 'لم يتم العثور على ملف مرفق', 400);
         } catch (\Exception $e) {
+            if (Uploads::isUploadProblem($e)) {
+                throw Uploads::failureFrom($e, $request->file('file'));
+            }
             return res_data($e->getMessage(), 'حدث خطأ أثناء رفع الملف', 500);
         }
     }

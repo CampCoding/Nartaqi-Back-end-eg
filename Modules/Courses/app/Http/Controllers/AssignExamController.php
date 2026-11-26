@@ -3,6 +3,7 @@
 namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -130,7 +131,7 @@ class AssignExamController extends Controller
      */
     private function storeExamPdf($file): string
     {
-        return $file->store('exam_pdfs', 'public');
+        return $file->store('exam_pdfs', 'public') ?: Uploads::storageFailed($file, 'exam_pdfs');
     }
 
 

@@ -3,6 +3,7 @@
 namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Illuminate\Http\Request;
 use Modules\Courses\Models\CompetitionsModel;
 use Modules\Courses\Http\Requests\StoreCompetitionRequest;
@@ -101,7 +102,7 @@ class CompetitionsController extends Controller
             // Handle image upload
             if ($request->hasFile('image')) {
                 $image = $request->file('image');
-                $imagePath = $image->store('competitions', 'public');
+                $imagePath = $image->store('competitions', 'public') ?: Uploads::storageFailed($image, 'competitions');
                 $data['image'] = $imagePath;
             }
 
@@ -167,7 +168,7 @@ class CompetitionsController extends Controller
 
                 $image = $request->file('image');
                 $imageName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
-                $imagePath = $image->storeAs('competitions', $imageName, 'public');
+                $imagePath = $image->storeAs('competitions', $imageName, 'public') ?: Uploads::storageFailed($image, 'competitions');
                 $data['image'] = $imagePath;
             }
 

@@ -3,6 +3,7 @@
 namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Illuminate\Http\Request;
 use Modules\Authentication\Models\Student;
 use Modules\Courses\Models\Rounds;
@@ -168,7 +169,7 @@ class StudentsController extends Controller
                 $file->move($destinationPath, $fileName);
                 $fileUrl = asset('storage/broadcast_messages/' . $fileName);
             } catch (\Throwable $e) {
-                return res_data('فشل رفع الملف: ' . $e->getMessage(), 'error', 500);
+                throw Uploads::failureFrom($e, $request->file('file'));
             }
         }
 

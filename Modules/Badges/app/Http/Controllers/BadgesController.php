@@ -3,6 +3,7 @@
 namespace Modules\Badges\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Support\Uploads;
 use Modules\Badges\Models\Badge;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
@@ -78,7 +79,7 @@ class BadgesController extends Controller
 
         $data = $request->validated();
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('badges', 'public');
+            $path = $request->file('image')->store('badges', 'public') ?: Uploads::storageFailed($request->file('image'), 'badges');
             $data['image'] = config('app.url') . '/storage/app/public/' . $path;
         }
         $badge = Badge::create($data);
@@ -98,7 +99,7 @@ class BadgesController extends Controller
             return res_data('هذه الشارة غير موجود','failed',404);
         }
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('badges', 'public');
+            $path = $request->file('image')->store('badges', 'public') ?: Uploads::storageFailed($request->file('image'), 'badges');
             $data['image'] = config('app.url') . '/storage/app/public/' . $path;
         }
         $badge->update($data);
