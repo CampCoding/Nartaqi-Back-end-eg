@@ -5,6 +5,7 @@ namespace Modules\Courses\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use App\Support\Uploads;
 
 class EditExamPdfRequest extends FormRequest
 {
@@ -18,7 +19,7 @@ class EditExamPdfRequest extends FormRequest
             'lesson_id' => 'sometimes',
             'title' => 'nullable|string|max:255',
             'description' => 'nullable',
-            'pdf_url' => 'nullable|file|mimes:pdf|max:20480',
+            'pdf_url' => 'nullable|file|mimes:pdf|max:' . Uploads::PDF_MAX_KB, // max 500MB
             'type' => 'nullable',
         ];
     }
@@ -31,7 +32,8 @@ class EditExamPdfRequest extends FormRequest
             'pdf_url.nullable' => 'رابط الملف مطلوب',
             'pdf_url.file' => 'رابط الملف يجب أن يكون ملف',
             'pdf_url.mimes' => 'رابط الملف يجب أن يكون من نوع PDF',
-            'pdf_url.max' => 'رابط الملف يجب أن يكون أقل من 20 ميجابايت',
+            'pdf_url.max' => Uploads::PDF_MAX_MESSAGE,
+            'pdf_url.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
         ];
     }
     protected function failedValidation(Validator $validator): void

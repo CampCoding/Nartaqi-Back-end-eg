@@ -5,6 +5,7 @@ namespace Modules\Courses\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use App\Support\Uploads;
 
 class EditRoundRequest extends FormRequest
 {
@@ -28,8 +29,9 @@ class EditRoundRequest extends FormRequest
             'free' => 'sometimes|boolean',
             'capacity' => 'sometimes|integer|min:0',
             'time_show' => 'nullable',
-            'round_road_map_book' => 'sometimes',
-            'round_book' => 'sometimes',
+            // Books: checked only when a file is sent; up to 500MB.
+            'round_road_map_book' => $this->file('round_road_map_book') ? ['file', 'max:' . Uploads::PDF_MAX_KB] : ['sometimes'],
+            'round_book' => $this->file('round_book') ? ['file', 'max:' . Uploads::PDF_MAX_KB] : ['sometimes'],
             'source' => 'sometimes|integer|in:0,1',
             'round_type' => 'sometimes|in:course,exams_only',
             'have_certificate' => 'sometimes|integer|in:0,1',
@@ -57,6 +59,10 @@ class EditRoundRequest extends FormRequest
             'goal.string' => 'الهدف يجب أن يكون نص',
             'goal.max' => 'الهدف لا يجب أن يتجاوز 255 حرف',
             'course_category_id.exists' => 'التصنيف غير موجود',
+            'round_book.max' => Uploads::FILE_MAX_MESSAGE,
+            'round_book.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
+            'round_road_map_book.max' => Uploads::FILE_MAX_MESSAGE,
+            'round_road_map_book.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
         ];
     }
 

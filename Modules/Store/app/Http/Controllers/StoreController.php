@@ -9,6 +9,7 @@ use Modules\Store\Models\StoreImage;
 use Modules\Store\Models\StudentBook;
 use Modules\Courses\Models\Rounds;
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Modules\Store\Services\UploadService;
 use Modules\Store\Http\Requests\StoreRequest;
 use Modules\Store\Http\Requests\UpdateStoreRequest;
@@ -183,9 +184,13 @@ class StoreController extends Controller
 
     public function uploadFile(Request $request)
     {
+        $isPdf = Uploads::isPdf($request->file('file'));
         $request->validate([
-            'file' => 'required|file|max:20480', // 20MB
+            'file' => 'required|file|max:' . ($isPdf ? Uploads::PDF_MAX_KB : 20480), // PDF 500MB, anything else 20MB
             'type' => 'required|in:image,book'
+        ], [
+            'file.max' => $isPdf ? Uploads::PDF_MAX_MESSAGE : 'حجم الملف لا يجب أن يتجاوز 20 ميجابايت',
+            'file.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
         ]);
 
         $path = $request->type === 'image' ? 'store/images' : 'store/books';

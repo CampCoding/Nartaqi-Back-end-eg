@@ -83,6 +83,9 @@ class AdminBlogsController extends Controller
             $image->move($destinationPath, $imageName);
             $validated['image'] = 'blogs' . '/' . $imageName;
             $validated['image_cover'] = $validated['image'];
+        } else {
+            // No cover yet (every field is optional); it can be added later from update_blog.
+            unset($validated['image']);
         }
         Blog::create($validated);
 

@@ -3,6 +3,7 @@
 namespace Modules\Courses\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Modules\Courses\Models\CategoryPartsModel;
 use Modules\Courses\Models\UserRounds;
 use Modules\Favourite\Models\Favourite;
@@ -33,11 +34,13 @@ class CoursesController extends Controller
     public function uploadFile(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|extensions:pdf,doc,docx,ppt,pptx,xls,xlsx,png,jpg,jpeg',
+            'file' => 'required|file|extensions:pdf,doc,docx,ppt,pptx,xls,xlsx,png,jpg,jpeg|max:' . Uploads::PDF_MAX_KB, // max 500MB
             'phone' => 'required',
             'name' => 'required',
         ], [
             'file.required' => 'الملف مطلوب',
+            'file.max' => Uploads::FILE_MAX_MESSAGE,
+            'file.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
             'phone.required' => 'رقم الهاتف مطلوب',
             'name.required' => 'اسم الطالب مطلوب',
         ]);

@@ -38,9 +38,10 @@ class Blog extends Model
     protected static function booted(): void
     {
         // A blog saved without a slug gets one from its title. An existing slug is never changed here,
-        // so editing the title keeps the blog's link.
+        // so editing the title keeps the blog's link. A blog with no title yet gets its slug once a
+        // title is added (instead of a meaningless "blog-3" that would then stay forever).
         static::saving(function (Blog $blog) {
-            if (blank($blog->slug)) {
+            if (blank($blog->slug) && filled($blog->title)) {
                 $blog->slug = static::uniqueSlug((string) $blog->title, $blog->id);
             }
         });

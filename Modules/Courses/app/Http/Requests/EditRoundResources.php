@@ -6,6 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Validator as ValidationValidator;
+use App\Support\Uploads;
 
 class EditRoundResources extends FormRequest
 {
@@ -15,7 +16,7 @@ class EditRoundResources extends FormRequest
             'id' => 'required|exists:round_resources,id',
             'title' => 'required|string',
             'description' => 'nullable',
-            'file' => 'nullable|mimes:pdf|max:10240', // PDF file, max 10MB (optional for edit)
+            'file' => 'nullable|file|mimes:pdf|max:' . Uploads::PDF_MAX_KB, // PDF file, max 500MB (optional for edit)
             'show_date' => 'nullable'
 
         ];
@@ -28,7 +29,9 @@ class EditRoundResources extends FormRequest
             'title.required' => 'العنوان مطلوب',
             'title.string' => 'العنوان يجب أن يكون نص',
             'file.mimes' => 'يجب أن يكون الملف من نوع PDF',
-            'file.max' => 'حجم الملف يجب أن يكون أقل من 10 ميجابايت',
+            'file.file' => 'الملف يجب أن يكون ملف مرفوع',
+            'file.max' => Uploads::PDF_MAX_MESSAGE,
+            'file.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
         ];
     }
     protected function failedValidation(Validator $validator): void

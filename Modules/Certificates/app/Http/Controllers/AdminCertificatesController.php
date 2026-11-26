@@ -4,6 +4,7 @@ namespace Modules\Certificates\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Support\Uploads;
 use Modules\Certificates\Models\UserCertificate;
 use Modules\Certificates\Models\CertificateApplication;
 use Modules\Certificates\Http\Requests\AdminCertificatesRequest;
@@ -109,7 +110,13 @@ class AdminCertificatesController extends Controller
     public function uploadCertificatePdf(Request $request)
     {
         $request->validate([
-            'pdf' => 'required|mimes:pdf',
+            'pdf' => 'required|file|mimes:pdf|max:' . Uploads::PDF_MAX_KB, // max 500MB
+        ], [
+            'pdf.required' => 'ملف الـ PDF مطلوب',
+            'pdf.file' => 'ملف الـ PDF يجب أن يكون ملف',
+            'pdf.mimes' => 'الملف يجب أن يكون من نوع PDF',
+            'pdf.max' => Uploads::PDF_MAX_MESSAGE,
+            'pdf.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
         ]);
 
         if ($request->hasFile('pdf')) {

@@ -6,6 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Validator as ValidationValidator;
+use App\Support\Uploads;
 
 class AddRoundResources extends FormRequest
 {
@@ -18,7 +19,7 @@ class AddRoundResources extends FormRequest
             'round_id' => 'required|exists:rounds,id',
             'title' => 'required|string',
             'description' => 'nullable',
-            'file' => 'required',
+            'file' => 'required|file|max:' . Uploads::PDF_MAX_KB, // max 500MB
             'show_date' => 'nullable'
         ];
     }
@@ -29,7 +30,10 @@ class AddRoundResources extends FormRequest
             'round_id.exists' => 'الجولة غير موجودة',
             'title.required' => 'العنوان مطلوب',
             'title.string' => 'العنوان يجب أن يكون نص',
-            'file.required' => 'الملف مطلوب'
+            'file.required' => 'الملف مطلوب',
+            'file.file' => 'الملف يجب أن يكون ملف مرفوع',
+            'file.max' => Uploads::FILE_MAX_MESSAGE,
+            'file.uploaded' => Uploads::UPLOAD_FAILED_MESSAGE,
 
         ];
     }
